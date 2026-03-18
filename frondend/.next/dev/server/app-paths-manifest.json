@@ -1,0 +1,13 @@
+{
+  "/admin/announcements/page": "app/admin/announcements/page.js",
+  "/admin/bills/page": "app/admin/bills/page.js",
+  "/admin/contracts/page": "app/admin/contracts/page.js",
+  "/admin/maintenance/page": "app/admin/maintenance/page.js",
+  "/admin/meters/page": "app/admin/meters/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/payments/page": "app/admin/payments/page.js",
+  "/admin/rooms/page": "app/admin/rooms/page.js",
+  "/admin/tenants/page": "app/admin/tenants/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js"
+}

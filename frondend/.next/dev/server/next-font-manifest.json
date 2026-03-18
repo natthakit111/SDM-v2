@@ -1,0 +1,51 @@
+{
+  "app": {
+    "[project]/app/admin/announcements/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/bills/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/contracts/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/maintenance/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/meters/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/payments/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/rooms/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/admin/tenants/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/login/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
+    "[project]/app/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

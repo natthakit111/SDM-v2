@@ -1,0 +1,33 @@
+/**
+ * routes/index.js — Central route aggregator (COMPLETE)
+ */
+const express = require('express')
+const router  = express.Router()
+
+const authRoutes         = require('./auth.routes')
+const roomRoutes         = require('./room.routes')
+const tenantRoutes       = require('./tenant.routes')
+const contractRoutes     = require('./contract.routes')
+const meterRoutes        = require('./meter.routes')
+const billRoutes         = require('./bill.routes')
+const utilityRateRoutes  = require('./utilityRate.routes')
+const paymentRoutes      = require('./payment.routes')
+const maintenanceRoutes  = require('./maintenance.routes')
+const announcementRoutes = require('./announcement.routes')
+const telegramRoutes     = require('./telegram.routes')
+const reportRoutes       = require('./report.routes')
+
+router.use('/auth',          authRoutes)
+router.use('/rooms',         roomRoutes)
+router.use('/tenants',       tenantRoutes)
+router.use('/contracts',     contractRoutes)
+router.use('/meters',        meterRoutes)
+router.use('/bills',         billRoutes)
+router.use('/utility-rates', utilityRateRoutes)
+router.use('/payments',      paymentRoutes)
+router.use('/maintenance',   maintenanceRoutes)
+router.use('/announcements', announcementRoutes)
+router.use('/telegram',      telegramRoutes)
+router.use('/reports',       reportRoutes)
+
+module.exports = router
