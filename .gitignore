@@ -19,7 +19,7 @@ pnpm-debug.log*
 # =========================
 dist/
 build/
-.next/        # Next.js build
+.next/       # Next.js build
 out/          # Next export
 
 # =========================
