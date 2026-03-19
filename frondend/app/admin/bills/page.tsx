@@ -1,9 +1,15 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -11,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -20,295 +26,352 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
-import { BillStatusBadge } from '@/components/common/status-badge'
-import { Plus, Search, Receipt, Eye, FileText, Settings } from 'lucide-react'
+} from "@/components/ui/select";
+import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import { BillStatusBadge } from "@/components/common/status-badge";
 import {
-  mockBills,
-  mockTenants,
-  mockRooms,
-  mockMeterReadings,
-  Bill,
-  formatCurrency,
-  formatDate,
-  dormSettings,
-} from '@/lib/mock-data'
-import { toast } from 'sonner'
+  Plus,
+  Search,
+  Receipt,
+  Eye,
+  FileText,
+  XCircle,
+  Loader2,
+} from "lucide-react";
+import { billAPI } from "@/lib/api/bill.api";
+import { roomAPI } from "@/lib/api/room.api";
+import { toast } from "sonner";
 
-const months = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-]
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface Bill {
+  bill_id: number;
+  contract_id: number;
+  room_id: number;
+  room_number: string;
+  tenant_name: string;
+  tenant_id: number;
+  bill_month: number;
+  bill_year: number;
+  rent_amount: number;
+  electric_amount: number;
+  water_amount: number;
+  other_amount: number;
+  total_amount: number;
+  due_date: string;
+  status: "pending" | "paid" | "overdue" | "cancelled";
+  qr_payload: string | null;
+}
+
+interface Room {
+  room_id: number;
+  room_number: string;
+  status: string;
+}
+
+interface FormData {
+  room_id: string;
+  month: string;
+  year: string;
+  other_amount: string;
+  due_date: string;
+}
+
+const emptyForm: FormData = {
+  room_id: "",
+  month: String(new Date().getMonth() + 1),
+  year: String(new Date().getFullYear()),
+  other_amount: "0",
+  due_date: "",
+};
+
+const MONTHS = [
+  "",
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function BillsPage() {
-  const [bills, setBills] = useState<Bill[]>(mockBills)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [viewingBill, setViewingBill] = useState<Bill | null>(null)
-  const [penaltySettings, setPenaltySettings] = useState({
-    penaltyRate: 5, // 5% per month
-    penaltyStartDay: 15, // After 15 days from due date
-  })
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [formData, setFormData] = useState({
-    roomId: '',
-    month: 'มีนาคม',
-    year: '2026',
-    otherFees: '0',
-    otherFeesDescription: '',
-  })
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [occupiedRooms, setOccupiedRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [viewingBill, setViewingBill] = useState<Bill | null>(null);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
 
-  const calculatePenalty = (bill: Bill, asOfDate?: string): number => {
-    if (bill.status === 'paid') return 0
-    
-    const today = asOfDate ? new Date(asOfDate) : new Date()
-    const dueDate = new Date(bill.dueDate)
-    const daysLate = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
-    
-    if (daysLate <= penaltySettings.penaltyStartDay) return 0
-    
-    const monthsLate = Math.ceil(daysLate / 30)
-    return Math.round((bill.total * penaltySettings.penaltyRate * monthsLate) / 100)
-  }
+  // ── Fetch bills ───────────────────────────────────────────────────────────
+  const fetchBills = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (statusFilter !== "all") params.status = statusFilter;
+      const res = await billAPI.getAll(params);
+      setBills(res.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลบิลไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
 
-  const activeTenants = mockTenants.filter(t => t.status === 'active')
+  // ── Fetch occupied rooms for generate form ────────────────────────────────
+  const fetchOccupiedRooms = async () => {
+    try {
+      const res = await roomAPI.getAll({ status: "occupied" });
+      setOccupiedRooms(res.data ?? []);
+    } catch {
+      /* ไม่ critical */
+    }
+  };
 
-  const filteredBills = bills.filter(bill => {
-    const matchesSearch = 
-      bill.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      bill.tenantName.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || bill.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  useEffect(() => {
+    fetchBills();
+  }, [fetchBills]);
+  useEffect(() => {
+    fetchOccupiedRooms();
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    const tenant = activeTenants.find(t => t.roomId === formData.roomId)
-    const room = mockRooms.find(r => r.id === formData.roomId)
-    const meterReading = mockMeterReadings.find(
-      m => m.roomId === formData.roomId && m.month === formData.month && m.year === parseInt(formData.year)
+  // ── Filter client-side ────────────────────────────────────────────────────
+  const filteredBills = bills.filter((b) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      b.room_number?.toLowerCase().includes(q) ||
+      b.tenant_name?.toLowerCase().includes(q)
+    );
+  });
+
+  // ── Generate bill ─────────────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await billAPI.generate({
+        room_id: parseInt(formData.room_id),
+        month: parseInt(formData.month),
+        year: parseInt(formData.year),
+        other_amount: parseFloat(formData.other_amount) || 0,
+        due_date: formData.due_date || undefined,
+      });
+      toast.success("สร้างบิลเรียบร้อย");
+      resetForm();
+      fetchBills();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "สร้างบิลไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Cancel bill ───────────────────────────────────────────────────────────
+  const handleCancel = async (bill: Bill) => {
+    if (
+      !confirm(
+        `ต้องการยกเลิกบิลห้อง ${bill.room_number} เดือน ${MONTHS[bill.bill_month]} ${bill.bill_year} หรือไม่?`,
+      )
     )
-
-    if (!tenant || !room) {
-      toast.error('กรุณาเลือกห้องที่มีผู้เช่า')
-      return
+      return;
+    try {
+      await billAPI.cancel(bill.bill_id);
+      toast.success("ยกเลิกบิลเรียบร้อย");
+      fetchBills();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "ยกเลิกบิลไม่สำเร็จ");
     }
-
-    if (!meterReading) {
-      toast.error('ไม่พบข้อมูลมิเตอร์สำหรับเดือนนี้ กรุณาบันทึกมิเตอร์ก่อน')
-      return
-    }
-
-    const electricityCost = meterReading.electricityUsed * dormSettings.electricityRate
-    const waterCost = meterReading.waterUsed * dormSettings.waterRate
-    const otherFees = parseInt(formData.otherFees) || 0
-    const baseTotal = room.monthlyRent + electricityCost + waterCost + dormSettings.commonFee + otherFees
-    const total = baseTotal
-
-    const newBill: Bill = {
-      id: Date.now().toString(),
-      roomId: formData.roomId,
-      roomNumber: room.number,
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      month: formData.month,
-      year: parseInt(formData.year),
-      rent: room.monthlyRent,
-      electricityUnits: meterReading.electricityUsed,
-      electricityRate: dormSettings.electricityRate,
-      electricityCost,
-      waterUnits: meterReading.waterUsed,
-      waterRate: dormSettings.waterRate,
-      waterCost,
-      commonFee: dormSettings.commonFee,
-      otherFees,
-      otherFeesDescription: formData.otherFeesDescription || undefined,
-      latePenalty: 0,
-      total,
-      status: 'pending',
-      dueDate: `${formData.year}-${String(months.indexOf(formData.month) + 1).padStart(2, '0')}-10`,
-      createdAt: new Date().toISOString().split('T')[0],
-    }
-
-    setBills(prev => [...prev, newBill])
-    toast.success('สร้างบิลเรียบร้อย')
-    resetForm()
-  }
+  };
 
   const resetForm = () => {
-    setFormData({
-      roomId: '',
-      month: 'มีนาคม',
-      year: '2026',
-      otherFees: '0',
-      otherFeesDescription: '',
-    })
-    setIsAddDialogOpen(false)
-  }
+    setFormData(emptyForm);
+    setIsAddDialogOpen(false);
+  };
 
+  const currentYear = new Date().getFullYear();
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">จัดการบิล</h1>
           <p className="text-muted-foreground">สร้างและจัดการบิลค่าเช่า</p>
         </div>
-        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Settings className="h-4 w-4" />
-              ตั้งค่าค่าปรับ
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>ตั้งค่าค่าปรับล่าช้า</DialogTitle>
-              <DialogDescription>กำหนดอัตราค่าปรับสำหรับการชำระที่ล่าช้า</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Field>
-                <FieldLabel htmlFor="penaltyRate">อัตราค่าปรับ (%)</FieldLabel>
-                <Input
-                  id="penaltyRate"
-                  type="number"
-                  value={penaltySettings.penaltyRate}
-                  onChange={(e) => setPenaltySettings({...penaltySettings, penaltyRate: parseInt(e.target.value) || 0})}
-                  min="0"
-                  max="100"
-                />
-                <p className="text-xs text-muted-foreground mt-1">อัตราค่าปรับต่อเดือนของยอดรวมบิล</p>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="penaltyStartDay">เริ่มคิดปรับหลังจากวัน (วัน)</FieldLabel>
-                <Input
-                  id="penaltyStartDay"
-                  type="number"
-                  value={penaltySettings.penaltyStartDay}
-                  onChange={(e) => setPenaltySettings({...penaltySettings, penaltyStartDay: parseInt(e.target.value) || 0})}
-                  min="0"
-                />
-                <p className="text-xs text-muted-foreground mt-1">จำนวนวันหลังจากวันที่กำหนดชำระที่คิดค่าปรับ</p>
-              </Field>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>
-                ปิด
-              </Button>
-              <Button onClick={() => {
-                setIsSettingsOpen(false)
-              }}>
-                บันทึก
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          if (!open) resetForm()
-          setIsAddDialogOpen(open)
-        }}>
+
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm();
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               สร้างบิล
             </Button>
           </DialogTrigger>
-          <DialogContent>
+
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>สร้างบิลใหม่</DialogTitle>
               <DialogDescription>
-                เลือกห้องและเดือนเพื่อสร้างบิล
+                เลือกห้องและเดือนเพื่อสร้างบิล (ต้องบันทึกมิเตอร์ก่อน)
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="roomId">ห้อง</FieldLabel>
+                  <FieldLabel>ห้อง (มีผู้เช่า)</FieldLabel>
                   <Select
-                    value={formData.roomId}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, roomId: value }))}
+                    value={formData.room_id}
+                    onValueChange={(v) =>
+                      setFormData((p) => ({ ...p, room_id: v }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="เลือกห้อง" />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeTenants.map((tenant) => (
-                        <SelectItem key={tenant.roomId} value={tenant.roomId || ''}>
-                          ห้อง {tenant.roomNumber} - {tenant.name}
+                      {occupiedRooms.map((r) => (
+                        <SelectItem key={r.room_id} value={String(r.room_id)}>
+                          ห้อง {r.room_number}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </Field>
+
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="month">เดือน</FieldLabel>
+                    <FieldLabel>เดือน</FieldLabel>
                     <Select
                       value={formData.month}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, month: value }))}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, month: v }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {months.map((month) => (
-                          <SelectItem key={month} value={month}>
-                            {month}
+                        {MONTHS.slice(1).map((m, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>
+                            {m}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="year">ปี</FieldLabel>
+                    <FieldLabel>ปี</FieldLabel>
                     <Select
                       value={formData.year}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, year: value }))}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, year: v }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2026">2026</SelectItem>
-                        <SelectItem value="2025">2025</SelectItem>
+                        {[currentYear, currentYear - 1].map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
+
                 <Field>
-                  <FieldLabel htmlFor="otherFees">ค่าใช้จ่ายอื่นๆ (บาท)</FieldLabel>
+                  <FieldLabel htmlFor="other_amount">
+                    ค่าใช้จ่ายอื่นๆ (บาท)
+                  </FieldLabel>
                   <Input
-                    id="otherFees"
+                    id="other_amount"
                     type="number"
-                    value={formData.otherFees}
-                    onChange={(e) => setFormData(prev => ({ ...prev, otherFees: e.target.value }))}
+                    value={formData.other_amount}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        other_amount: e.target.value,
+                      }))
+                    }
                     placeholder="0"
+                    min="0"
                   />
                 </Field>
+
                 <Field>
-                  <FieldLabel htmlFor="otherFeesDescription">รายละเอียดค่าใช้จ่ายอื่นๆ</FieldLabel>
+                  <FieldLabel htmlFor="due_date">
+                    วันกำหนดชำระ (ไม่บังคับ)
+                  </FieldLabel>
                   <Input
-                    id="otherFeesDescription"
-                    value={formData.otherFeesDescription}
-                    onChange={(e) => setFormData(prev => ({ ...prev, otherFeesDescription: e.target.value }))}
-                    placeholder="เช่น ค่าซ่อมแอร์"
+                    id="due_date"
+                    type="date"
+                    value={formData.due_date}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, due_date: e.target.value }))
+                    }
                   />
                 </Field>
               </FieldGroup>
+
               <DialogFooter className="mt-6">
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
                   ยกเลิก
                 </Button>
-                <Button type="submit">สร้างบิล</Button>
+                <Button
+                  type="submit"
+                  disabled={submitting || !formData.room_id}
+                >
+                  {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  สร้างบิล
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -337,73 +400,105 @@ export default function BillsPage() {
                 <SelectItem value="pending">รอชำระ</SelectItem>
                 <SelectItem value="paid">ชำระแล้ว</SelectItem>
                 <SelectItem value="overdue">เกินกำหนด</SelectItem>
-                <SelectItem value="partial">ชำระบางส่วน</SelectItem>
+                <SelectItem value="cancelled">ยกเลิก</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Bills Table */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
             รายการบิล
           </CardTitle>
-          <CardDescription>ทั้งหมด {filteredBills.length} รายการ</CardDescription>
+          <CardDescription>
+            ทั้งหมด {filteredBills.length} รายการ
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ห้อง</TableHead>
-                <TableHead>ผู้เช่า</TableHead>
-                <TableHead>เดือน/ปี</TableHead>
-                <TableHead className="text-right">ยอดรวม</TableHead>
-                <TableHead>กำหนดชำระ</TableHead>
-                <TableHead>สถานะ</TableHead>
-                <TableHead className="text-right">จัดการ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredBills.map((bill) => (
-                <TableRow key={bill.id}>
-                  <TableCell className="font-medium">{bill.roomNumber}</TableCell>
-                  <TableCell>{bill.tenantName}</TableCell>
-                  <TableCell>{bill.month} {bill.year}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(bill.total)}
-                  </TableCell>
-                  <TableCell>{formatDate(bill.dueDate)}</TableCell>
-                  <TableCell>
-                    <BillStatusBadge status={bill.status} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setViewingBill(bill)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredBills.length === 0 && (
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              กำลังโหลด...
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    ไม่พบบิลที่ตรงกับการค้นหา
-                  </TableCell>
+                  <TableHead>ห้อง</TableHead>
+                  <TableHead>ผู้เช่า</TableHead>
+                  <TableHead>เดือน/ปี</TableHead>
+                  <TableHead className="text-right">ยอดรวม</TableHead>
+                  <TableHead>กำหนดชำระ</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="text-right">จัดการ</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredBills.map((bill) => (
+                  <TableRow key={bill.bill_id}>
+                    <TableCell className="font-medium">
+                      {bill.room_number}
+                    </TableCell>
+                    <TableCell>{bill.tenant_name}</TableCell>
+                    <TableCell>
+                      {MONTHS[bill.bill_month]} {bill.bill_year}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(bill.total_amount)}
+                    </TableCell>
+                    <TableCell>{formatDate(bill.due_date)}</TableCell>
+                    <TableCell>
+                      <BillStatusBadge status={bill.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setViewingBill(bill)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {(bill.status === "pending" ||
+                          bill.status === "overdue") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCancel(bill)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredBills.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      ไม่พบบิลที่ตรงกับการค้นหา
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       {/* View Bill Dialog */}
-      <Dialog open={!!viewingBill} onOpenChange={(open) => !open && setViewingBill(null)}>
+      <Dialog
+        open={!!viewingBill}
+        onOpenChange={(open) => !open && setViewingBill(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -415,78 +510,53 @@ export default function BillsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-4 border-b">
                 <div>
-                  <p className="font-medium">ห้อง {viewingBill.roomNumber}</p>
-                  <p className="text-sm text-muted-foreground">{viewingBill.tenantName}</p>
+                  <p className="font-medium">ห้อง {viewingBill.room_number}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {viewingBill.tenant_name}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">{viewingBill.month} {viewingBill.year}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {MONTHS[viewingBill.bill_month]} {viewingBill.bill_year}
+                  </p>
                   <BillStatusBadge status={viewingBill.status} />
                 </div>
               </div>
-              
-              <div className="space-y-2">
+
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ค่าเช่า</span>
-                  <span>{formatCurrency(viewingBill.rent)}</span>
+                  <span>{formatCurrency(viewingBill.rent_amount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    ค่าไฟฟ้า ({viewingBill.electricityUnits} หน่วย x {viewingBill.electricityRate} บาท)
-                  </span>
-                  <span>{formatCurrency(viewingBill.electricityCost)}</span>
+                  <span className="text-muted-foreground">ค่าไฟฟ้า</span>
+                  <span>{formatCurrency(viewingBill.electric_amount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    ค่าน้ำ ({viewingBill.waterUnits} หน่วย x {viewingBill.waterRate} บาท)
-                  </span>
-                  <span>{formatCurrency(viewingBill.waterCost)}</span>
+                  <span className="text-muted-foreground">ค่าน้ำ</span>
+                  <span>{formatCurrency(viewingBill.water_amount)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ค่าส่วนกลาง</span>
-                  <span>{formatCurrency(viewingBill.commonFee)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2 mt-2">
-                  <span className="text-muted-foreground">ค่าปรับล่าช้า</span>
-                  <span className="text-destructive font-medium">
-                    {formatCurrency(calculatePenalty(viewingBill))}
-                  </span>
-                </div>
-                {viewingBill.otherFees > 0 && (
+                {viewingBill.other_amount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      ค่าอื่นๆ {viewingBill.otherFeesDescription && `(${viewingBill.otherFeesDescription})`}
-                    </span>
-                    <span>{formatCurrency(viewingBill.otherFees)}</span>
-                  </div>
-                )}
-                {viewingBill.latePenalty > 0 && (
-                  <div className="flex justify-between text-destructive">
-                    <span>ค่าปรับล่าช้า</span>
-                    <span>{formatCurrency(viewingBill.latePenalty)}</span>
+                    <span className="text-muted-foreground">ค่าอื่นๆ</span>
+                    <span>{formatCurrency(viewingBill.other_amount)}</span>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between pt-4 border-t font-bold text-lg">
                 <span>รวมทั้งหมด</span>
-                <span>{formatCurrency(viewingBill.total)}</span>
+                <span>{formatCurrency(viewingBill.total_amount)}</span>
               </div>
 
-              <div className="flex justify-between text-sm pt-2">
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">กำหนดชำระภายใน</span>
-                <span>{formatDate(viewingBill.dueDate)}</span>
+                <span>{formatDate(viewingBill.due_date)}</span>
               </div>
-
-              {viewingBill.paidAt && (
-                <div className="flex justify-between text-sm text-success">
-                  <span>ชำระเมื่อ</span>
-                  <span>{formatDate(viewingBill.paidAt)}</span>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

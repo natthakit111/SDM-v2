@@ -1,9 +1,15 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -11,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -20,174 +26,250 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
-import { RoomStatusBadge } from '@/components/common/status-badge'
-import { Plus, Search, Pencil, Trash2, DoorOpen } from 'lucide-react'
-import { mockRooms, Room, getRoomTypeLabel, formatCurrency } from '@/lib/mock-data'
-import { toast } from 'sonner'
+} from "@/components/ui/select";
+import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { RoomStatusBadge } from "@/components/common/status-badge";
+import { Plus, Search, Pencil, Trash2, DoorOpen, Loader2 } from "lucide-react";
+import { roomAPI } from "@/lib/api/room.api";
+import { toast } from "sonner";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface Room {
+  room_id: number;
+  room_number: string;
+  floor: number;
+  room_type: string;
+  area_sqm: number | null;
+  base_rent: number;
+  status: "available" | "occupied" | "maintenance";
+  description: string | null;
+}
+
+interface FormData {
+  room_number: string;
+  floor: string;
+  room_type: string;
+  base_rent: string;
+  area_sqm: string;
+  status: "available" | "occupied" | "maintenance";
+  description: string;
+}
+
+const emptyForm: FormData = {
+  room_number: "",
+  floor: "1",
+  room_type: "standard",
+  base_rent: "",
+  area_sqm: "",
+  status: "available",
+  description: "",
+};
+
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function RoomsPage() {
-  const [rooms, setRooms] = useState<Room[]>(mockRooms)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingRoom, setEditingRoom] = useState<Room | null>(null)
-  const [formData, setFormData] = useState({
-    number: '',
-    floor: '1',
-    type: 'standard' as Room['type'],
-    status: 'available' as Room['status'],
-    monthlyRent: '',
-    deposit: '',
-  })
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
 
-  const filteredRooms = rooms.filter(room => {
-    const matchesSearch = room.number.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || room.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const fetchRooms = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await roomAPI.getAll(
+        statusFilter !== "all" ? { status: statusFilter } : undefined,
+      );
+      setRooms(res.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลห้องไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (editingRoom) {
-      // Update existing room
-      setRooms(prev => prev.map(room => 
-        room.id === editingRoom.id
-          ? {
-              ...room,
-              number: formData.number,
-              floor: parseInt(formData.floor),
-              type: formData.type,
-              status: formData.status,
-              monthlyRent: parseInt(formData.monthlyRent),
-              deposit: parseInt(formData.deposit),
-            }
-          : room
-      ))
-      toast.success('อัปเดตข้อมูลห้องเรียบร้อย')
-    } else {
-      // Add new room
-      const newRoom: Room = {
-        id: Date.now().toString(),
-        number: formData.number,
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
+
+  // ── Filter search client-side ──────────────────────────────────────────────
+  const filteredRooms = rooms.filter((r) =>
+    r.room_number.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const payload = {
+        room_number: formData.room_number,
         floor: parseInt(formData.floor),
-        type: formData.type,
+        room_type: formData.room_type,
+        base_rent: parseFloat(formData.base_rent),
+        area_sqm: formData.area_sqm ? parseFloat(formData.area_sqm) : undefined,
         status: formData.status,
-        monthlyRent: parseInt(formData.monthlyRent),
-        deposit: parseInt(formData.deposit),
-        amenities: [],
+        description: formData.description || undefined,
+      };
+
+      if (editingRoom) {
+        await roomAPI.update(editingRoom.room_id, payload);
+        toast.success("อัปเดตข้อมูลห้องเรียบร้อย");
+      } else {
+        await roomAPI.create(payload);
+        toast.success("เพิ่มห้องใหม่เรียบร้อย");
       }
-      setRooms(prev => [...prev, newRoom])
-      toast.success('เพิ่มห้องใหม่เรียบร้อย')
+      resetForm();
+      fetchRooms();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่",
+      );
+    } finally {
+      setSubmitting(false);
     }
-    
-    resetForm()
-  }
+  };
 
+  // ── Edit ───────────────────────────────────────────────────────────────────
   const handleEdit = (room: Room) => {
-    setEditingRoom(room)
+    setEditingRoom(room);
     setFormData({
-      number: room.number,
+      room_number: room.room_number,
       floor: room.floor.toString(),
-      type: room.type,
+      room_type: room.room_type,
+      base_rent: room.base_rent.toString(),
+      area_sqm: room.area_sqm?.toString() ?? "",
       status: room.status,
-      monthlyRent: room.monthlyRent.toString(),
-      deposit: room.deposit.toString(),
-    })
-    setIsAddDialogOpen(true)
-  }
+      description: room.description ?? "",
+    });
+    setIsAddDialogOpen(true);
+  };
 
-  const handleDelete = (roomId: string) => {
-    if (confirm('คุณต้องการลบห้องนี้หรือไม่?')) {
-      setRooms(prev => prev.filter(room => room.id !== roomId))
-      toast.success('ลบห้องเรียบร้อย')
+  // ── Delete ─────────────────────────────────────────────────────────────────
+  const handleDelete = async (room: Room) => {
+    if (room.status === "occupied") {
+      toast.error("ไม่สามารถลบห้องที่มีผู้เช่าอยู่ได้");
+      return;
     }
-  }
+    if (!confirm(`ต้องการลบห้อง ${room.room_number} หรือไม่?`)) return;
+    try {
+      await roomAPI.delete(room.room_id);
+      toast.success("ลบห้องเรียบร้อย");
+      fetchRooms();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "ลบไม่สำเร็จ");
+    }
+  };
 
   const resetForm = () => {
-    setFormData({
-      number: '',
-      floor: '1',
-      type: 'standard',
-      status: 'available',
-      monthlyRent: '',
-      deposit: '',
-    })
-    setEditingRoom(null)
-    setIsAddDialogOpen(false)
-  }
+    setFormData(emptyForm);
+    setEditingRoom(null);
+    setIsAddDialogOpen(false);
+  };
 
+  const set =
+    (field: keyof FormData) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">จัดการห้องพัก</h1>
           <p className="text-muted-foreground">จัดการห้องพักทั้งหมดในระบบ</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          if (!open) resetForm()
-          setIsAddDialogOpen(open)
-        }}>
+
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm();
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               เพิ่มห้อง
             </Button>
           </DialogTrigger>
-          <DialogContent>
+
+          <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>{editingRoom ? 'แก้ไขห้อง' : 'เพิ่มห้องใหม่'}</DialogTitle>
+              <DialogTitle>
+                {editingRoom ? "แก้ไขห้อง" : "เพิ่มห้องใหม่"}
+              </DialogTitle>
               <DialogDescription>
-                {editingRoom ? 'แก้ไขข้อมูลห้องพัก' : 'กรอกข้อมูลเพื่อเพิ่มห้องใหม่'}
+                {editingRoom
+                  ? "แก้ไขข้อมูลห้องพัก"
+                  : "กรอกข้อมูลเพื่อเพิ่มห้องใหม่"}
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="number">หมายเลขห้อง</FieldLabel>
+                    <FieldLabel htmlFor="room_number">หมายเลขห้อง</FieldLabel>
                     <Input
-                      id="number"
-                      value={formData.number}
-                      onChange={(e) => setFormData(prev => ({ ...prev, number: e.target.value }))}
+                      id="room_number"
+                      value={formData.room_number}
+                      onChange={set("room_number")}
                       placeholder="เช่น 101"
                       required
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="floor">ชั้น</FieldLabel>
+                    <FieldLabel>ชั้น</FieldLabel>
                     <Select
                       value={formData.floor}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, floor: value }))}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, floor: v }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5].map((floor) => (
-                          <SelectItem key={floor} value={floor.toString()}>
-                            ชั้น {floor}
+                        {[1, 2, 3, 4, 5].map((f) => (
+                          <SelectItem key={f} value={f.toString()}>
+                            ชั้น {f}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="type">ประเภทห้อง</FieldLabel>
+                    <FieldLabel>ประเภทห้อง</FieldLabel>
                     <Select
-                      value={formData.type}
-                      onValueChange={(value: Room['type']) => setFormData(prev => ({ ...prev, type: value }))}
+                      value={formData.room_type}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, room_type: v }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -200,10 +282,15 @@ export default function RoomsPage() {
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="status">สถานะ</FieldLabel>
+                    <FieldLabel>สถานะ</FieldLabel>
                     <Select
                       value={formData.status}
-                      onValueChange={(value: Room['status']) => setFormData(prev => ({ ...prev, status: value }))}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({
+                          ...p,
+                          status: v as FormData["status"],
+                        }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -212,42 +299,62 @@ export default function RoomsPage() {
                         <SelectItem value="available">ว่าง</SelectItem>
                         <SelectItem value="occupied">มีผู้เช่า</SelectItem>
                         <SelectItem value="maintenance">ซ่อมบำรุง</SelectItem>
-                        <SelectItem value="reserved">จอง</SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="monthlyRent">ค่าเช่า/เดือน (บาท)</FieldLabel>
+                    <FieldLabel htmlFor="base_rent">
+                      ค่าเช่า/เดือน (บาท)
+                    </FieldLabel>
                     <Input
-                      id="monthlyRent"
+                      id="base_rent"
                       type="number"
-                      value={formData.monthlyRent}
-                      onChange={(e) => setFormData(prev => ({ ...prev, monthlyRent: e.target.value }))}
+                      value={formData.base_rent}
+                      onChange={set("base_rent")}
                       placeholder="4500"
                       required
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="deposit">เงินประกัน (บาท)</FieldLabel>
+                    <FieldLabel htmlFor="area_sqm">พื้นที่ (ตร.ม.)</FieldLabel>
                     <Input
-                      id="deposit"
+                      id="area_sqm"
                       type="number"
-                      value={formData.deposit}
-                      onChange={(e) => setFormData(prev => ({ ...prev, deposit: e.target.value }))}
-                      placeholder="9000"
-                      required
+                      value={formData.area_sqm}
+                      onChange={set("area_sqm")}
+                      placeholder="28"
                     />
                   </Field>
                 </div>
+
+                <Field>
+                  <FieldLabel htmlFor="description">หมายเหตุ</FieldLabel>
+                  <Input
+                    id="description"
+                    value={formData.description}
+                    onChange={set("description")}
+                    placeholder="รายละเอียดเพิ่มเติม"
+                  />
+                </Field>
               </FieldGroup>
+
               <DialogFooter className="mt-6">
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
                   ยกเลิก
                 </Button>
-                <Button type="submit">
-                  {editingRoom ? 'บันทึก' : 'เพิ่มห้อง'}
+                <Button type="submit" disabled={submitting}>
+                  {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {editingRoom ? "บันทึก" : "เพิ่มห้อง"}
                 </Button>
               </DialogFooter>
             </form>
@@ -277,14 +384,13 @@ export default function RoomsPage() {
                 <SelectItem value="available">ว่าง</SelectItem>
                 <SelectItem value="occupied">มีผู้เช่า</SelectItem>
                 <SelectItem value="maintenance">ซ่อมบำรุง</SelectItem>
-                <SelectItem value="reserved">จอง</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Rooms Table */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -294,61 +400,75 @@ export default function RoomsPage() {
           <CardDescription>ทั้งหมด {filteredRooms.length} ห้อง</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ห้อง</TableHead>
-                <TableHead>ชั้น</TableHead>
-                <TableHead>ประเภท</TableHead>
-                <TableHead>ค่าเช่า</TableHead>
-                <TableHead>เงินประกัน</TableHead>
-                <TableHead>สถานะ</TableHead>
-                <TableHead className="text-right">จัดการ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRooms.map((room) => (
-                <TableRow key={room.id}>
-                  <TableCell className="font-medium">{room.number}</TableCell>
-                  <TableCell>{room.floor}</TableCell>
-                  <TableCell>{getRoomTypeLabel(room.type)}</TableCell>
-                  <TableCell>{formatCurrency(room.monthlyRent)}</TableCell>
-                  <TableCell>{formatCurrency(room.deposit)}</TableCell>
-                  <TableCell>
-                    <RoomStatusBadge status={room.status} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(room)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(room.id)}
-                        disabled={room.status === 'occupied'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredRooms.length === 0 && (
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              กำลังโหลด...
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    ไม่พบห้องพักที่ตรงกับการค้นหา
-                  </TableCell>
+                  <TableHead>ห้อง</TableHead>
+                  <TableHead>ชั้น</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>พื้นที่</TableHead>
+                  <TableHead>ค่าเช่า</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="text-right">จัดการ</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredRooms.map((room) => (
+                  <TableRow key={room.room_id}>
+                    <TableCell className="font-medium">
+                      {room.room_number}
+                    </TableCell>
+                    <TableCell>{room.floor}</TableCell>
+                    <TableCell>{room.room_type}</TableCell>
+                    <TableCell>
+                      {room.area_sqm ? `${room.area_sqm} ตร.ม.` : "-"}
+                    </TableCell>
+                    <TableCell>{formatCurrency(room.base_rent)}</TableCell>
+                    <TableCell>
+                      <RoomStatusBadge status={room.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(room)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(room)}
+                          disabled={room.status === "occupied"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredRooms.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      ไม่พบห้องพักที่ตรงกับการค้นหา
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

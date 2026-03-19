@@ -1,44 +1,151 @@
-'use client'
+"use client";
 
-import { StatsCard } from '@/components/common/stats-card'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { BillStatusBadge, MaintenanceStatusBadge } from '@/components/common/status-badge'
+import { useState, useEffect } from "react";
+import { StatsCard } from "@/components/common/stats-card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  BillStatusBadge,
+  MaintenanceStatusBadge,
+} from "@/components/common/status-badge";
 import {
   DoorOpen,
   Users,
   Receipt,
   Banknote,
   AlertTriangle,
-  TrendingUp,
   ArrowRight,
   Wrench,
-} from 'lucide-react'
-import {
-  mockRooms,
-  mockTenants,
-  mockBills,
-  mockMaintenanceRequests,
-  formatCurrency,
-} from '@/lib/mock-data'
-import Link from 'next/link'
+  Loader2,
+} from "lucide-react";
+import { roomAPI } from "@/lib/api/room.api";
+import { billAPI } from "@/lib/api/bill.api";
+import { maintenanceAPI } from "@/lib/api/maintenance.api";
+import { tenantAPI } from "@/lib/api/tenant.api";
+import { formatCurrency } from "@/lib/mock-data";
+import Link from "next/link";
+
+// ── Types (ตรงกับ backend response) ──────────────────────────
+interface RoomStats {
+  total: number;
+  occupied: number;
+  available: number;
+  maintenance: number;
+}
+
+interface Room {
+  room_id: number;
+  room_number: string;
+  status: "available" | "occupied" | "maintenance";
+}
+
+interface Bill {
+  bill_id: number;
+  room_id: number;
+  room_number?: string;
+  total_amount: number;
+  status: "pending" | "paid" | "overdue" | "cancelled";
+  bill_month: number;
+  bill_year: number;
+}
+
+interface MaintenanceRequest {
+  request_id: number;
+  category: string;
+  description: string;
+  room_number?: string;
+  status: "pending" | "in_progress" | "resolved" | "cancelled";
+  priority: "low" | "medium" | "high";
+}
 
 export default function AdminDashboard() {
-  // Calculate stats
-  const totalRooms = mockRooms.length
-  const occupiedRooms = mockRooms.filter(r => r.status === 'occupied').length
-  const availableRooms = mockRooms.filter(r => r.status === 'available').length
-  const activeTenants = mockTenants.filter(t => t.status === 'active').length
-  const pendingBills = mockBills.filter(b => b.status === 'pending' || b.status === 'overdue')
-  const pendingAmount = pendingBills.reduce((sum, b) => sum + b.total, 0)
-  const paidBills = mockBills.filter(b => b.status === 'paid')
-  const monthlyIncome = paidBills.reduce((sum, b) => sum + b.total, 0)
-  const overdueBills = mockBills.filter(b => b.status === 'overdue')
-  const pendingMaintenance = mockMaintenanceRequests.filter(m => m.status === 'pending' || m.status === 'in_progress')
+  const [roomStats, setRoomStats] = useState<RoomStats>({
+    total: 0,
+    occupied: 0,
+    available: 0,
+    maintenance: 0,
+  });
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [maintenance, setMaintenance] = useState<MaintenanceRequest[]>([]);
+  const [tenantCount, setTenantCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const recentBills = mockBills.slice(0, 5)
-  const recentMaintenance = mockMaintenanceRequests.slice(0, 5)
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const [statsRes, roomsRes, billsRes, maintenanceRes, tenantsRes] =
+          await Promise.all([
+            roomAPI.getStats(),
+            roomAPI.getAll(),
+            billAPI.getAll(),
+            maintenanceAPI.getAll(),
+            tenantAPI.getAll(),
+          ]);
+
+        // Backend ส่ง { success, data: {...} }
+        setRoomStats(statsRes.data ?? statsRes);
+        setRooms(roomsRes.data ?? roomsRes ?? []);
+        setBills(billsRes.data ?? billsRes ?? []);
+        setMaintenance(maintenanceRes.data ?? maintenanceRes ?? []);
+
+        // tenants — นับจาก array
+        const tenantData = tenantsRes.data ?? tenantsRes ?? [];
+        setTenantCount(Array.isArray(tenantData) ? tenantData.length : 0);
+      } catch (err: any) {
+        setError(err.response?.data?.message ?? "โหลดข้อมูลไม่สำเร็จ");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  // ── Computed stats ────────────────────────────────────────
+  const pendingBills = bills.filter(
+    (b) => b.status === "pending" || b.status === "overdue",
+  );
+  const overdueBills = bills.filter((b) => b.status === "overdue");
+  const paidBills = bills.filter((b) => b.status === "paid");
+  const pendingAmount = pendingBills.reduce(
+    (sum, b) => sum + Number(b.total_amount),
+    0,
+  );
+  const monthlyIncome = paidBills.reduce(
+    (sum, b) => sum + Number(b.total_amount),
+    0,
+  );
+  const pendingMaintenance = maintenance.filter(
+    (m) => m.status === "pending" || m.status === "in_progress",
+  );
+
+  const recentBills = bills.slice(0, 5);
+  const recentMaintenance = maintenance.slice(0, 5);
+
+  // ── Loading / Error ───────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <p className="text-destructive">{error}</p>
+        <Button onClick={() => window.location.reload()}>ลองใหม่</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -51,14 +158,14 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="ห้องทั้งหมด"
-          value={`${occupiedRooms}/${totalRooms}`}
-          description={`ว่าง ${availableRooms} ห้อง`}
+          value={`${roomStats.occupied}/${roomStats.total}`}
+          description={`ว่าง ${roomStats.available} ห้อง`}
           icon={DoorOpen}
           variant="primary"
         />
         <StatsCard
           title="ผู้เช่าทั้งหมด"
-          value={activeTenants}
+          value={tenantCount}
           description="คนที่กำลังเช่าอยู่"
           icon={Users}
           variant="default"
@@ -68,7 +175,7 @@ export default function AdminDashboard() {
           value={formatCurrency(pendingAmount)}
           description={`${pendingBills.length} รายการ`}
           icon={Receipt}
-          variant={overdueBills.length > 0 ? 'destructive' : 'warning'}
+          variant={overdueBills.length > 0 ? "destructive" : "warning"}
         />
         <StatsCard
           title="รายได้เดือนนี้"
@@ -76,7 +183,6 @@ export default function AdminDashboard() {
           description={`จาก ${paidBills.length} บิล`}
           icon={Banknote}
           variant="success"
-          trend={{ value: 12, isPositive: true }}
         />
       </div>
 
@@ -91,7 +197,9 @@ export default function AdminDashboard() {
                     <AlertTriangle className="h-5 w-5 text-destructive" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-destructive">บิลเกินกำหนดชำระ</h3>
+                    <h3 className="font-semibold text-destructive">
+                      บิลเกินกำหนดชำระ
+                    </h3>
                     <p className="text-sm text-muted-foreground">
                       มี {overdueBills.length} รายการที่เกินกำหนดชำระ
                     </p>
@@ -113,7 +221,9 @@ export default function AdminDashboard() {
                     <Wrench className="h-5 w-5 text-warning-foreground" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-warning-foreground">รายการแจ้งซ่อมรอดำเนินการ</h3>
+                    <h3 className="font-semibold text-warning-foreground">
+                      รายการแจ้งซ่อมรอดำเนินการ
+                    </h3>
                     <p className="text-sm text-muted-foreground">
                       มี {pendingMaintenance.length} รายการที่รอดำเนินการ
                     </p>
@@ -141,26 +251,40 @@ export default function AdminDashboard() {
             </div>
             <Link href="/admin/bills">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด
-                <ArrowRight className="ml-2 h-4 w-4" />
+                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {recentBills.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  ไม่มีรายการบิล
+                </p>
+              )}
               {recentBills.map((bill) => (
-                <div key={bill.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div
+                  key={bill.bill_id}
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-muted">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">ห้อง {bill.roomNumber}</p>
-                      <p className="text-sm text-muted-foreground">{bill.tenantName}</p>
+                      {/* ✅ ใช้ room_number แทน roomNumber */}
+                      <p className="font-medium">
+                        ห้อง {bill.room_number ?? bill.room_id}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {bill.bill_month}/{bill.bill_year}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{formatCurrency(bill.total)}</p>
+                    <p className="font-medium">
+                      {formatCurrency(bill.total_amount)}
+                    </p>
                     <BillStatusBadge status={bill.status} />
                   </div>
                 </div>
@@ -178,27 +302,35 @@ export default function AdminDashboard() {
             </div>
             <Link href="/admin/maintenance">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด
-                <ArrowRight className="ml-2 h-4 w-4" />
+                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentMaintenance.map((request) => (
-                <div key={request.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              {recentMaintenance.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  ไม่มีรายการแจ้งซ่อม
+                </p>
+              )}
+              {recentMaintenance.map((req) => (
+                <div
+                  key={req.request_id}
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-muted">
                       <Wrench className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">{request.title}</p>
-                      <p className="text-sm text-muted-foreground">ห้อง {request.roomNumber}</p>
+                      {/* ✅ ใช้ category + description แทน title */}
+                      <p className="font-medium">{req.category}</p>
+                      <p className="text-sm text-muted-foreground">
+                        ห้อง {req.room_number ?? "-"}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <MaintenanceStatusBadge status={request.status} />
-                  </div>
+                  <MaintenanceStatusBadge status={req.status} />
                 </div>
               ))}
             </div>
@@ -213,31 +345,36 @@ export default function AdminDashboard() {
           <CardDescription>สถานะห้องพักทั้งหมดในหอพัก</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {mockRooms.map((room) => (
-              <Link
-                key={room.id}
-                href={`/admin/rooms/${room.id}`}
-                className={`
-                  p-4 rounded-lg border text-center transition-colors hover:border-primary
-                  ${room.status === 'available' ? 'bg-success/10 border-success/30' : ''}
-                  ${room.status === 'occupied' ? 'bg-primary/10 border-primary/30' : ''}
-                  ${room.status === 'maintenance' ? 'bg-warning/10 border-warning/30' : ''}
-                  ${room.status === 'reserved' ? 'bg-secondary border-border' : ''}
-                `}
-              >
-                <p className="font-bold text-lg">{room.number}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {room.status === 'available' && 'ว่าง'}
-                  {room.status === 'occupied' && 'มีผู้เช่า'}
-                  {room.status === 'maintenance' && 'ซ่อมบำรุง'}
-                  {room.status === 'reserved' && 'จอง'}
-                </p>
-              </Link>
-            ))}
-          </div>
+          {rooms.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              ไม่มีข้อมูลห้องพัก
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {rooms.map((room) => (
+                <Link
+                  key={room.room_id}
+                  href={`/admin/rooms`}
+                  className={`
+                    p-4 rounded-lg border text-center transition-colors hover:border-primary
+                    ${room.status === "available" ? "bg-success/10 border-success/30" : ""}
+                    ${room.status === "occupied" ? "bg-primary/10 border-primary/30" : ""}
+                    ${room.status === "maintenance" ? "bg-warning/10 border-warning/30" : ""}
+                  `}
+                >
+                  {/* ✅ ใช้ room_number แทน number */}
+                  <p className="font-bold text-lg">{room.room_number}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {room.status === "available" && "ว่าง"}
+                    {room.status === "occupied" && "มีผู้เช่า"}
+                    {room.status === "maintenance" && "ซ่อมบำรุง"}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

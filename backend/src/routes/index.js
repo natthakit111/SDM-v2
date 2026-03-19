@@ -16,6 +16,7 @@ const maintenanceRoutes  = require('./maintenance.routes')
 const announcementRoutes = require('./announcement.routes')
 const telegramRoutes     = require('./telegram.routes')
 const reportRoutes       = require('./report.routes')
+const settingsRoutes     = require('./settings.routes')
 
 router.use('/auth',          authRoutes)
 router.use('/rooms',         roomRoutes)
@@ -29,5 +30,6 @@ router.use('/maintenance',   maintenanceRoutes)
 router.use('/announcements', announcementRoutes)
 router.use('/telegram',      telegramRoutes)
 router.use('/reports',       reportRoutes)
+router.use('/settings',      settingsRoutes)
 
 module.exports = router

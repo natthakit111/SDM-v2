@@ -1,216 +1,384 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { FileText, Plus, Download, Eye } from 'lucide-react'
-import StatusBadge from '@/components/common/status-badge'
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import { FileText, Plus, Eye, XCircle, Loader2, Search } from "lucide-react";
+import { contractAPI } from "@/lib/api/contract.api";
+import { tenantAPI } from "@/lib/api/tenant.api";
+import { roomAPI } from "@/lib/api/room.api";
+import { toast } from "sonner";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Contract {
-  id: string
-  tenantName: string
-  room: string
-  startDate: string
-  endDate: string
-  duration: number
-  deposit: number
-  rentAmount: number
-  status: 'active' | 'expired' | 'pending'
-  pdfUrl?: string
+  contract_id: number;
+  tenant_id: number;
+  room_id: number;
+  tenant_name: string;
+  room_number: string;
+  start_date: string;
+  end_date: string;
+  rent_amount: number;
+  deposit_amount: number;
+  status: "active" | "expired" | "terminated";
+  note: string | null;
 }
 
+interface FormData {
+  tenant_id: string;
+  room_id: string;
+  start_date: string;
+  end_date: string;
+  rent_amount: string;
+  deposit_amount: string;
+  note: string;
+}
+
+const emptyForm: FormData = {
+  tenant_id: "",
+  room_id: "",
+  start_date: "",
+  end_date: "",
+  rent_amount: "",
+  deposit_amount: "",
+  note: "",
+};
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+const formatCurrency = (n: number) => n.toLocaleString("th-TH") + " บาท";
+
+const statusLabel: Record<string, { label: string; color: string }> = {
+  active: { label: "ใช้งานอยู่", color: "bg-green-500/10 text-green-500" },
+  expired: { label: "หมดอายุ", color: "bg-red-500/10 text-red-500" },
+  terminated: { label: "ยกเลิกแล้ว", color: "bg-muted text-muted-foreground" },
+};
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export default function ContractsPage() {
-  const [contracts, setContracts] = useState<Contract[]>([
-    {
-      id: 'CNT001',
-      tenantName: 'นายสมชาย มั่นสถิร',
-      room: 'A101',
-      startDate: '2023-11-15',
-      endDate: '2024-11-14',
-      duration: 12,
-      deposit: 2000,
-      rentAmount: 5000,
-      status: 'active'
-    },
-    {
-      id: 'CNT002',
-      tenantName: 'นางสาวธัญชนก นามวงค์',
-      room: 'B205',
-      startDate: '2024-01-01',
-      endDate: '2024-06-30',
-      duration: 6,
-      deposit: 1500,
-      rentAmount: 4500,
-      status: 'active'
-    },
-    {
-      id: 'CNT003',
-      tenantName: 'นายวิชัย ยศวินัย',
-      room: 'A205',
-      startDate: '2023-06-01',
-      endDate: '2024-05-31',
-      duration: 12,
-      deposit: 2000,
-      rentAmount: 5000,
-      status: 'expired'
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [availableRooms, setAvailableRooms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [viewingContract, setViewingContract] = useState<Contract | null>(null);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
+
+  // ── Fetch contracts ───────────────────────────────────────────────────────
+  const fetchContracts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (filterStatus !== "all") params.status = filterStatus;
+      const res = await contractAPI.getAll(params);
+      setContracts(res.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลสัญญาไม่สำเร็จ");
+    } finally {
+      setLoading(false);
     }
-  ])
+  }, [filterStatus]);
 
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
-  const [isOpenNewContract, setIsOpenNewContract] = useState(false)
-  const [newContract, setNewContract] = useState({
-    tenantName: '',
-    room: '',
-    startDate: '',
-    endDate: '',
-    duration: 12,
-    deposit: 0,
-    rentAmount: 0,
-  })
-
-  const handleAddContract = () => {
-    if (!newContract.tenantName || !newContract.room || !newContract.startDate || !newContract.endDate) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน')
-      return
+  // ── Fetch tenants + available rooms for form ──────────────────────────────
+  const fetchFormOptions = async () => {
+    try {
+      const [tRes, rRes] = await Promise.all([
+        tenantAPI.getAll(),
+        roomAPI.getAll({ status: "available" }),
+      ]);
+      setTenants(tRes.data ?? []);
+      setAvailableRooms(rRes.data ?? []);
+    } catch {
+      /* ไม่ critical */
     }
+  };
 
-    const contract: Contract = {
-      id: `CNT${String(contracts.length + 1).padStart(3, '0')}`,
-      tenantName: newContract.tenantName,
-      room: newContract.room,
-      startDate: newContract.startDate,
-      endDate: newContract.endDate,
-      duration: newContract.duration,
-      deposit: newContract.deposit,
-      rentAmount: newContract.rentAmount,
-      status: 'pending'
+  useEffect(() => {
+    fetchContracts();
+  }, [fetchContracts]);
+  useEffect(() => {
+    fetchFormOptions();
+  }, []);
+
+  // ── Filter client-side ────────────────────────────────────────────────────
+  const filteredContracts = contracts.filter((c) => {
+    const q = searchTerm.toLowerCase();
+    return (
+      c.tenant_name?.toLowerCase().includes(q) ||
+      c.room_number?.toLowerCase().includes(q) ||
+      String(c.contract_id).includes(q)
+    );
+  });
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const totalDeposit = contracts
+    .filter((c) => c.status === "active")
+    .reduce((sum, c) => sum + Number(c.deposit_amount), 0);
+
+  // ── Create contract ───────────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await contractAPI.create({
+        tenant_id: parseInt(formData.tenant_id),
+        room_id: parseInt(formData.room_id),
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        rent_amount: formData.rent_amount
+          ? parseFloat(formData.rent_amount)
+          : undefined,
+        deposit_amount: formData.deposit_amount
+          ? parseFloat(formData.deposit_amount)
+          : undefined,
+        note: formData.note || undefined,
+      });
+      toast.success("สร้างสัญญาเรียบร้อย");
+      resetForm();
+      fetchContracts();
+      fetchFormOptions(); // refresh available rooms
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "สร้างสัญญาไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
     }
+  };
 
-    setContracts([...contracts, contract])
-    setIsOpenNewContract(false)
-    setNewContract({
-      tenantName: '',
-      room: '',
-      startDate: '',
-      endDate: '',
-      duration: 12,
-      deposit: 0,
-      rentAmount: 0,
-    })
-  }
+  // ── Terminate contract ────────────────────────────────────────────────────
+  const handleTerminate = async (contract: Contract) => {
+    if (
+      !confirm(
+        `ต้องการยกเลิกสัญญาของ ${contract.tenant_name} ห้อง ${contract.room_number} หรือไม่?`,
+      )
+    )
+      return;
+    try {
+      const res = await contractAPI.terminate(contract.contract_id);
+      toast.success(res.message ?? "ยกเลิกสัญญาเรียบร้อย");
+      setViewingContract(null);
+      fetchContracts();
+      fetchFormOptions();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "ยกเลิกสัญญาไม่สำเร็จ");
+    }
+  };
 
-  const filteredContracts = contracts.filter(contract => {
-    const matchesSearch = contract.tenantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contract.room.includes(searchTerm) ||
-                         contract.id.includes(searchTerm)
-    const matchesFilter = filterStatus === 'all' || contract.status === filterStatus
-    return matchesSearch && matchesFilter
-  })
+  const resetForm = () => {
+    setFormData(emptyForm);
+    setIsAddDialogOpen(false);
+  };
 
+  const set =
+    (field: keyof FormData) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setFormData((p) => ({ ...p, [field]: e.target.value }));
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">สัญญาเช่า</h1>
-          <p className="text-muted-foreground mt-2">จัดการสัญญาเช่าและเงินประกัน</p>
+          <p className="text-muted-foreground mt-2">
+            จัดการสัญญาเช่าและเงินประกัน
+          </p>
         </div>
-        <Dialog open={isOpenNewContract} onOpenChange={setIsOpenNewContract}>
+
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm();
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
               สัญญาใหม่
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>สร้างสัญญาเช่าใหม่</DialogTitle>
               <DialogDescription>กรอกข้อมูลสัญญาเช่า</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">ชื่อผู้เช่า</label>
-                  <Input 
-                    placeholder="ชื่อผู้เช่า"
-                    value={newContract.tenantName}
-                    onChange={(e) => setNewContract({...newContract, tenantName: e.target.value})}
-                  />
+
+            <form onSubmit={handleSubmit}>
+              <FieldGroup>
+                {/* ผู้เช่า */}
+                <Field>
+                  <FieldLabel>ผู้เช่า</FieldLabel>
+                  <Select
+                    value={formData.tenant_id}
+                    onValueChange={(v) =>
+                      setFormData((p) => ({ ...p, tenant_id: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกผู้เช่า" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenants.map((t) => (
+                        <SelectItem
+                          key={t.tenant_id}
+                          value={String(t.tenant_id)}
+                        >
+                          {t.first_name} {t.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                {/* ห้อง */}
+                <Field>
+                  <FieldLabel>ห้องพัก (ว่างอยู่)</FieldLabel>
+                  <Select
+                    value={formData.room_id}
+                    onValueChange={(v) =>
+                      setFormData((p) => ({ ...p, room_id: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกห้อง" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableRooms.map((r) => (
+                        <SelectItem key={r.room_id} value={String(r.room_id)}>
+                          ห้อง {r.room_number} —{" "}
+                          {r.base_rent?.toLocaleString("th-TH")} บาท/เดือน
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                {/* วันที่ */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="start_date">วันเริ่มต้น</FieldLabel>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={formData.start_date}
+                      onChange={set("start_date")}
+                      required
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="end_date">วันสิ้นสุด</FieldLabel>
+                    <Input
+                      id="end_date"
+                      type="date"
+                      value={formData.end_date}
+                      onChange={set("end_date")}
+                      required
+                    />
+                  </Field>
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">หมายเลขห้อง</label>
-                  <Input 
-                    placeholder="เช่น A101"
-                    value={newContract.room}
-                    onChange={(e) => setNewContract({...newContract, room: e.target.value})}
-                  />
+
+                {/* ค่าเช่า / เงินประกัน */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="rent_amount">
+                      ค่าเช่า/เดือน (บาท)
+                    </FieldLabel>
+                    <Input
+                      id="rent_amount"
+                      type="number"
+                      value={formData.rent_amount}
+                      onChange={set("rent_amount")}
+                      placeholder="ใช้ค่าเช่าจากห้อง"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="deposit_amount">
+                      เงินประกัน (บาท)
+                    </FieldLabel>
+                    <Input
+                      id="deposit_amount"
+                      type="number"
+                      value={formData.deposit_amount}
+                      onChange={set("deposit_amount")}
+                      placeholder="0"
+                    />
+                  </Field>
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">วันเริ่มต้น</label>
-                  <Input 
-                    type="date"
-                    value={newContract.startDate}
-                    onChange={(e) => setNewContract({...newContract, startDate: e.target.value})}
+
+                <Field>
+                  <FieldLabel htmlFor="note">หมายเหตุ</FieldLabel>
+                  <Input
+                    id="note"
+                    value={formData.note}
+                    onChange={set("note")}
+                    placeholder="หมายเหตุเพิ่มเติม"
                   />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">วันสิ้นสุด</label>
-                  <Input 
-                    type="date"
-                    value={newContract.endDate}
-                    onChange={(e) => setNewContract({...newContract, endDate: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">ระยะเวลา (เดือน)</label>
-                  <Input 
-                    type="number"
-                    placeholder="12"
-                    value={newContract.duration}
-                    onChange={(e) => setNewContract({...newContract, duration: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">ค่าเช่ารายเดือน (บาท)</label>
-                  <Input 
-                    type="number"
-                    placeholder="5000"
-                    value={newContract.rentAmount}
-                    onChange={(e) => setNewContract({...newContract, rentAmount: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium mb-1 block">เงินประกัน (บาท)</label>
-                  <Input 
-                    type="number"
-                    placeholder="2000"
-                    value={newContract.deposit}
-                    onChange={(e) => setNewContract({...newContract, deposit: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end pt-4">
-                <Button variant="outline" onClick={() => setIsOpenNewContract(false)}>
+                </Field>
+              </FieldGroup>
+
+              <DialogFooter className="mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
                   ยกเลิก
                 </Button>
-                <Button onClick={handleAddContract}>
+                <Button
+                  type="submit"
+                  disabled={
+                    submitting || !formData.tenant_id || !formData.room_id
+                  }
+                >
+                  {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   สร้างสัญญา
                 </Button>
-              </div>
-            </div>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">รวมทั้งหมด</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              รวมทั้งหมด
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{contracts.length}</div>
@@ -218,26 +386,38 @@ export default function ContractsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">ใช้งานอยู่</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              ใช้งานอยู่
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{contracts.filter(c => c.status === 'active').length}</div>
+            <div className="text-2xl font-bold text-green-500">
+              {contracts.filter((c) => c.status === "active").length}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">หมดอายุ</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              หมดอายุ/ยกเลิก
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{contracts.filter(c => c.status === 'expired').length}</div>
+            <div className="text-2xl font-bold text-destructive">
+              {contracts.filter((c) => c.status !== "active").length}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">รวมเงินประกัน</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              รวมเงินประกัน
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{contracts.reduce((sum, c) => sum + c.deposit, 0).toLocaleString('th-TH')} บาท</div>
+            <div className="text-2xl font-bold">
+              {totalDeposit.toLocaleString("th-TH")} บาท
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -246,11 +426,13 @@ export default function ContractsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Input 
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
                 placeholder="ค้นหา ชื่อ ห้อง หรือ ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
               />
             </div>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -261,7 +443,7 @@ export default function ContractsPage() {
                 <SelectItem value="all">ทั้งหมด</SelectItem>
                 <SelectItem value="active">ใช้งานอยู่</SelectItem>
                 <SelectItem value="expired">หมดอายุ</SelectItem>
-                <SelectItem value="pending">รอการยืนยัน</SelectItem>
+                <SelectItem value="terminated">ยกเลิกแล้ว</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -269,116 +451,167 @@ export default function ContractsPage() {
       </Card>
 
       {/* Contracts List */}
-      <div className="space-y-3">
-        {filteredContracts.map(contract => (
-          <Card key={contract.id}>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex gap-4 flex-1">
-                  <div className="bg-primary/10 p-3 rounded-lg h-fit">
-                    <FileText className="w-6 h-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-bold text-lg">{contract.tenantName}</h3>
-                        <p className="text-sm text-muted-foreground">ห้อง {contract.room} • {contract.id}</p>
-                        <div className="flex gap-2 mt-3 flex-wrap">
-                          <span className="text-xs bg-muted px-2 py-1 rounded">
-                            ค่าเช่า {contract.rentAmount.toLocaleString('th-TH')} บาท
-                          </span>
-                          <span className="text-xs bg-muted px-2 py-1 rounded">
-                            เงินประกัน {contract.deposit.toLocaleString('th-TH')} บาท
-                          </span>
-                          <span className="text-xs bg-muted px-2 py-1 rounded">
-                            {contract.duration} เดือน
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          กำลังโหลด...
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredContracts.map((contract) => {
+            const s = statusLabel[contract.status] ?? statusLabel.expired;
+            return (
+              <Card key={contract.contract_id}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex gap-4 flex-1">
+                      <div className="bg-primary/10 p-3 rounded-lg h-fit">
+                        <FileText className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="font-bold text-lg">
+                              {contract.tenant_name}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              ห้อง {contract.room_number} • CNT
+                              {String(contract.contract_id).padStart(3, "0")}
+                            </p>
+                            <div className="flex gap-2 mt-3 flex-wrap">
+                              <span className="text-xs bg-muted px-2 py-1 rounded">
+                                ค่าเช่า{" "}
+                                {Number(contract.rent_amount).toLocaleString(
+                                  "th-TH",
+                                )}{" "}
+                                บาท
+                              </span>
+                              <span className="text-xs bg-muted px-2 py-1 rounded">
+                                เงินประกัน{" "}
+                                {Number(contract.deposit_amount).toLocaleString(
+                                  "th-TH",
+                                )}{" "}
+                                บาท
+                              </span>
+                              <span className="text-xs bg-muted px-2 py-1 rounded">
+                                {formatDate(contract.start_date)} —{" "}
+                                {formatDate(contract.end_date)}
+                              </span>
+                            </div>
+                          </div>
+                          <span
+                            className={`text-xs font-medium px-2 py-1 rounded ${s.color}`}
+                          >
+                            {s.label}
                           </span>
                         </div>
                       </div>
-                      <StatusBadge 
-                        status={contract.status === 'active' ? 'ใช้งานอยู่' : contract.status === 'expired' ? 'หมดอายุ' : 'รอการยืนยัน'}
-                        variant={contract.status === 'active' ? 'success' : contract.status === 'expired' ? 'destructive' : 'default'}
-                      />
                     </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-1">
+
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => setViewingContract(contract)}
+                      >
                         <Eye className="w-4 h-4" />
                         <span className="hidden sm:inline">ดู</span>
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>รายละเอียดสัญญาเช่า</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm text-muted-foreground">ชื่อผู้เช่า</p>
-                            <p className="font-medium">{selectedContract?.tenantName || contract.tenantName}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">ห้อง</p>
-                            <p className="font-medium">{selectedContract?.room || contract.room}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">วันเริ่มต้น</p>
-                            <p className="font-medium">
-                              {new Date(contract.startDate).toLocaleDateString('th-TH', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                              })}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">วันสิ้นสุด</p>
-                            <p className="font-medium">
-                              {new Date(contract.endDate).toLocaleDateString('th-TH', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                              })}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
-                            <p className="font-medium">{contract.rentAmount.toLocaleString('th-TH')} บาท</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">เงินประกัน</p>
-                            <p className="font-medium">{contract.deposit.toLocaleString('th-TH')} บาท</p>
-                          </div>
-                        </div>
-                        <Button variant="outline" className="w-full gap-2">
-                          <Download className="w-4 h-4" />
-                          ดาวน์โหลด PDF
+                      {contract.status === "active" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-destructive hover:text-destructive"
+                          onClick={() => handleTerminate(contract)}
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span className="hidden sm:inline">ยกเลิก</span>
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline">ดาวน์โหลด</span>
-                  </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {filteredContracts.length === 0 && (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">ไม่พบสัญญาเช่า</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* View Dialog */}
+      <Dialog
+        open={!!viewingContract}
+        onOpenChange={(open) => !open && setViewingContract(null)}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>รายละเอียดสัญญาเช่า</DialogTitle>
+          </DialogHeader>
+          {viewingContract && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">ชื่อผู้เช่า</p>
+                  <p className="font-medium">{viewingContract.tenant_name}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">ห้อง</p>
+                  <p className="font-medium">{viewingContract.room_number}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">วันเริ่มต้น</p>
+                  <p className="font-medium">
+                    {formatDate(viewingContract.start_date)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">วันสิ้นสุด</p>
+                  <p className="font-medium">
+                    {formatDate(viewingContract.end_date)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">ค่าเช่ารายเดือน</p>
+                  <p className="font-medium">
+                    {formatCurrency(Number(viewingContract.rent_amount))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">เงินประกัน</p>
+                  <p className="font-medium">
+                    {formatCurrency(Number(viewingContract.deposit_amount))}
+                  </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredContracts.length === 0 && (
-        <Card>
-          <CardContent className="pt-6 text-center py-12">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="text-muted-foreground">ไม่พบสัญญาเช่า</p>
-          </CardContent>
-        </Card>
-      )}
+              {viewingContract.note && (
+                <div className="text-sm">
+                  <p className="text-muted-foreground">หมายเหตุ</p>
+                  <p>{viewingContract.note}</p>
+                </div>
+              )}
+              {viewingContract.status === "active" && (
+                <Button
+                  variant="destructive"
+                  className="w-full gap-2"
+                  onClick={() => handleTerminate(viewingContract)}
+                >
+                  <XCircle className="w-4 h-4" />
+                  ยกเลิกสัญญา (Check-out)
+                </Button>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }

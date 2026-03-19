@@ -3,7 +3,7 @@
  * Handles: POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
  */
 
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const UserModel = require('../models/user.model');

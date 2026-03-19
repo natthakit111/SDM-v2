@@ -1,10 +1,16 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -12,7 +18,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -20,81 +26,138 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
-import { MaintenanceStatusBadge, PriorityBadge } from '@/components/common/status-badge'
-import { Search, Wrench, Eye, CheckCircle } from 'lucide-react'
-import { mockMaintenanceRequests, MaintenanceRequest, getMaintenanceCategoryLabel, formatDate } from '@/lib/mock-data'
-import { toast } from 'sonner'
+} from "@/components/ui/select";
+import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import {
+  MaintenanceStatusBadge,
+  PriorityBadge,
+} from "@/components/common/status-badge";
+import { Search, Wrench, Eye, CheckCircle, Loader2 } from "lucide-react";
+import { maintenanceAPI } from "@/lib/api/maintenance.api";
+import { toast } from "sonner";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface MaintenanceRequest {
+  request_id: number;
+  tenant_id: number;
+  room_id: number;
+  room_number: string;
+  tenant_name: string;
+  category: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  status: "pending" | "in_progress" | "resolved" | "cancelled";
+  assigned_to: string | null;
+  admin_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
+interface UpdateData {
+  status: string;
+  assigned_to: string;
+  admin_note: string;
+}
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function MaintenancePage() {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>(mockMaintenanceRequests)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [viewingRequest, setViewingRequest] = useState<MaintenanceRequest | null>(null)
-  const [updateData, setUpdateData] = useState({
-    status: '',
-    assignedTo: '',
-    adminNote: '',
-  })
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [viewingRequest, setViewingRequest] =
+    useState<MaintenanceRequest | null>(null);
+  const [updateData, setUpdateData] = useState<UpdateData>({
+    status: "",
+    assigned_to: "",
+    admin_note: "",
+  });
 
-  const filteredRequests = requests.filter(request => {
-    const matchesSearch = 
-      request.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.tenantName.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || request.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  const fetchRequests = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (statusFilter !== "all") params.status = statusFilter;
+      const res = await maintenanceAPI.getAll(params);
+      setRequests(res.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
 
-  const handleUpdate = () => {
-    if (!viewingRequest) return
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
-    setRequests(prev => prev.map(request => 
-      request.id === viewingRequest.id
-        ? {
-            ...request,
-            status: updateData.status as MaintenanceRequest['status'] || request.status,
-            assignedTo: updateData.assignedTo || request.assignedTo,
-            adminNote: updateData.adminNote || request.adminNote,
-            completedAt: updateData.status === 'completed' ? new Date().toISOString().split('T')[0] : request.completedAt,
-          }
-        : request
-    ))
-    toast.success('อัปเดตรายการแจ้งซ่อมเรียบร้อย')
-    setViewingRequest(null)
-    resetUpdateData()
-  }
+  // ── Filter client-side ────────────────────────────────────────────────────
+  const filteredRequests = requests.filter((r) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      r.room_number?.toLowerCase().includes(q) ||
+      r.category?.toLowerCase().includes(q) ||
+      r.tenant_name?.toLowerCase().includes(q)
+    );
+  });
 
-  const resetUpdateData = () => {
-    setUpdateData({
-      status: '',
-      assignedTo: '',
-      adminNote: '',
-    })
-  }
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
+
+  // ── Update status ─────────────────────────────────────────────────────────
+  const handleUpdate = async () => {
+    if (!viewingRequest) return;
+    setUpdating(true);
+    try {
+      await maintenanceAPI.updateStatus(viewingRequest.request_id, {
+        status: updateData.status || viewingRequest.status,
+        admin_note: updateData.admin_note || undefined,
+        assigned_to: updateData.assigned_to || undefined,
+      });
+      toast.success("อัปเดตรายการแจ้งซ่อมเรียบร้อย");
+      setViewingRequest(null);
+      fetchRequests();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "อัปเดตไม่สำเร็จ");
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const openViewDialog = (request: MaintenanceRequest) => {
-    setViewingRequest(request)
+    setViewingRequest(request);
     setUpdateData({
       status: request.status,
-      assignedTo: request.assignedTo || '',
-      adminNote: request.adminNote || '',
-    })
-  }
+      assigned_to: request.assigned_to ?? "",
+      admin_note: request.admin_note ?? "",
+    });
+  };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">จัดการแจ้งซ่อม</h1>
-        <p className="text-muted-foreground">รับและจัดการรายการแจ้งซ่อมจากผู้เช่า</p>
+        <p className="text-muted-foreground">
+          รับและจัดการรายการแจ้งซ่อมจากผู้เช่า
+        </p>
       </div>
 
       {/* Filters */}
@@ -104,7 +167,7 @@ export default function MaintenancePage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาหมายเลขห้อง, หัวข้อ หรือชื่อผู้เช่า..."
+                placeholder="ค้นหาหมายเลขห้อง, หมวดหมู่ หรือชื่อผู้เช่า..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -118,7 +181,7 @@ export default function MaintenancePage() {
                 <SelectItem value="all">สถานะทั้งหมด</SelectItem>
                 <SelectItem value="pending">รอดำเนินการ</SelectItem>
                 <SelectItem value="in_progress">กำลังดำเนินการ</SelectItem>
-                <SelectItem value="completed">เสร็จสิ้น</SelectItem>
+                <SelectItem value="resolved">เสร็จสิ้น</SelectItem>
                 <SelectItem value="cancelled">ยกเลิก</SelectItem>
               </SelectContent>
             </Select>
@@ -127,17 +190,17 @@ export default function MaintenancePage() {
       </Card>
 
       {/* Pending Alert */}
-      {requests.filter(r => r.status === 'pending').length > 0 && (
-        <Card className="border-warning/50 bg-warning/5">
+      {pendingCount > 0 && (
+        <Card className="border-yellow-500/50 bg-yellow-500/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-warning/20">
-                <Wrench className="h-5 w-5 text-warning-foreground" />
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <Wrench className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-warning-foreground">รอดำเนินการ</h3>
+                <h3 className="font-semibold">รอดำเนินการ</h3>
                 <p className="text-sm text-muted-foreground">
-                  มี {requests.filter(r => r.status === 'pending').length} รายการที่รอดำเนินการ
+                  มี {pendingCount} รายการที่รอดำเนินการ
                 </p>
               </div>
             </div>
@@ -145,131 +208,147 @@ export default function MaintenancePage() {
         </Card>
       )}
 
-      {/* Maintenance Table */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
             รายการแจ้งซ่อม
           </CardTitle>
-          <CardDescription>ทั้งหมด {filteredRequests.length} รายการ</CardDescription>
+          <CardDescription>
+            ทั้งหมด {filteredRequests.length} รายการ
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ห้อง</TableHead>
-                <TableHead>หัวข้อ</TableHead>
-                <TableHead>หมวดหมู่</TableHead>
-                <TableHead>ความสำคัญ</TableHead>
-                <TableHead>แจ้งเมื่อ</TableHead>
-                <TableHead>สถานะ</TableHead>
-                <TableHead className="text-right">จัดการ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRequests.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell className="font-medium">{request.roomNumber}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{request.title}</p>
-                      <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                        {request.description}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getMaintenanceCategoryLabel(request.category)}</TableCell>
-                  <TableCell>
-                    <PriorityBadge priority={request.priority} />
-                  </TableCell>
-                  <TableCell>{formatDate(request.createdAt)}</TableCell>
-                  <TableCell>
-                    <MaintenanceStatusBadge status={request.status} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openViewDialog(request)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredRequests.length === 0 && (
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              กำลังโหลด...
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    ไม่พบรายการแจ้งซ่อมที่ตรงกับการค้นหา
-                  </TableCell>
+                  <TableHead>ห้อง</TableHead>
+                  <TableHead>ผู้แจ้ง</TableHead>
+                  <TableHead>หมวดหมู่</TableHead>
+                  <TableHead>ความสำคัญ</TableHead>
+                  <TableHead>แจ้งเมื่อ</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="text-right">จัดการ</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredRequests.map((request) => (
+                  <TableRow key={request.request_id}>
+                    <TableCell className="font-medium">
+                      {request.room_number}
+                    </TableCell>
+                    <TableCell>{request.tenant_name}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{request.category}</p>
+                        <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+                          {request.description}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <PriorityBadge priority={request.priority} />
+                    </TableCell>
+                    <TableCell>{formatDate(request.created_at)}</TableCell>
+                    <TableCell>
+                      <MaintenanceStatusBadge status={request.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openViewDialog(request)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredRequests.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      ไม่พบรายการแจ้งซ่อมที่ตรงกับการค้นหา
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       {/* View/Update Dialog */}
-      <Dialog open={!!viewingRequest} onOpenChange={(open) => {
-        if (!open) {
-          setViewingRequest(null)
-          resetUpdateData()
-        }
-      }}>
+      <Dialog
+        open={!!viewingRequest}
+        onOpenChange={(open) => {
+          if (!open) setViewingRequest(null);
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>รายละเอียดการแจ้งซ่อม</DialogTitle>
-            <DialogDescription>
-              ดูรายละเอียดและอัปเดตสถานะการแจ้งซ่อม
-            </DialogDescription>
+            <DialogDescription>ดูรายละเอียดและอัปเดตสถานะ</DialogDescription>
           </DialogHeader>
+
           {viewingRequest && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Info */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-sm text-muted-foreground">ห้อง</p>
-                  <p className="font-medium">{viewingRequest.roomNumber}</p>
+                  <p className="text-muted-foreground">ห้อง</p>
+                  <p className="font-medium">{viewingRequest.room_number}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">ผู้แจ้ง</p>
-                  <p className="font-medium">{viewingRequest.tenantName}</p>
+                  <p className="text-muted-foreground">ผู้แจ้ง</p>
+                  <p className="font-medium">{viewingRequest.tenant_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">หมวดหมู่</p>
-                  <p className="font-medium">{getMaintenanceCategoryLabel(viewingRequest.category)}</p>
+                  <p className="text-muted-foreground">หมวดหมู่</p>
+                  <p className="font-medium">{viewingRequest.category}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">ความสำคัญ</p>
+                  <p className="text-muted-foreground">ความสำคัญ</p>
                   <PriorityBadge priority={viewingRequest.priority} />
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm text-muted-foreground">หัวข้อ</p>
-                <p className="font-medium">{viewingRequest.title}</p>
+              <div className="text-sm">
+                <p className="text-muted-foreground mb-1">รายละเอียด</p>
+                <p className="bg-muted/50 p-3 rounded-lg">
+                  {viewingRequest.description}
+                </p>
               </div>
 
-              <div>
-                <p className="text-sm text-muted-foreground">รายละเอียด</p>
-                <p className="text-sm bg-muted/50 p-3 rounded-lg">{viewingRequest.description}</p>
-              </div>
-
+              {/* Update form */}
               <div className="pt-4 border-t space-y-4">
                 <FieldGroup>
                   <Field>
                     <FieldLabel>สถานะ</FieldLabel>
                     <Select
                       value={updateData.status}
-                      onValueChange={(value) => setUpdateData(prev => ({ ...prev, status: value }))}
+                      onValueChange={(v) =>
+                        setUpdateData((p) => ({ ...p, status: v }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending">รอดำเนินการ</SelectItem>
-                        <SelectItem value="in_progress">กำลังดำเนินการ</SelectItem>
-                        <SelectItem value="completed">เสร็จสิ้น</SelectItem>
+                        <SelectItem value="in_progress">
+                          กำลังดำเนินการ
+                        </SelectItem>
+                        <SelectItem value="resolved">เสร็จสิ้น</SelectItem>
                         <SelectItem value="cancelled">ยกเลิก</SelectItem>
                       </SelectContent>
                     </Select>
@@ -277,16 +356,26 @@ export default function MaintenancePage() {
                   <Field>
                     <FieldLabel>มอบหมายให้</FieldLabel>
                     <Input
-                      value={updateData.assignedTo}
-                      onChange={(e) => setUpdateData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                      value={updateData.assigned_to}
+                      onChange={(e) =>
+                        setUpdateData((p) => ({
+                          ...p,
+                          assigned_to: e.target.value,
+                        }))
+                      }
                       placeholder="ชื่อช่างหรือผู้รับผิดชอบ"
                     />
                   </Field>
                   <Field>
                     <FieldLabel>หมายเหตุ</FieldLabel>
                     <Textarea
-                      value={updateData.adminNote}
-                      onChange={(e) => setUpdateData(prev => ({ ...prev, adminNote: e.target.value }))}
+                      value={updateData.admin_note}
+                      onChange={(e) =>
+                        setUpdateData((p) => ({
+                          ...p,
+                          admin_note: e.target.value,
+                        }))
+                      }
                       placeholder="บันทึกเพิ่มเติม..."
                       rows={3}
                     />
@@ -295,11 +384,19 @@ export default function MaintenancePage() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setViewingRequest(null)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setViewingRequest(null)}
+                  disabled={updating}
+                >
                   ยกเลิก
                 </Button>
-                <Button onClick={handleUpdate}>
-                  <CheckCircle className="mr-2 h-4 w-4" />
+                <Button onClick={handleUpdate} disabled={updating}>
+                  {updating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                  )}
                   บันทึก
                 </Button>
               </DialogFooter>
@@ -308,5 +405,5 @@ export default function MaintenancePage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

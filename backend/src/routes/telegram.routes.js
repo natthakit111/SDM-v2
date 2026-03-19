@@ -59,6 +59,33 @@ router.get('/status', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/telegram/broadcast  — admin only
+// Body: { message }
+router.post('/broadcast', authenticate, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { message } = req.body;
+    if (!message?.trim()) return sendBadRequest(res, 'message is required');
+
+    // ใช้ broadcastAnnouncement ที่มีอยู่แล้วใน TelegramService
+    const TelegramService = require('../services/telegram.service');
+    await TelegramService.broadcastAnnouncement('ข้อความจากผู้ดูแล', message, 'tenant', null);
+
+    // นับจำนวนที่ส่งได้
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM users u
+       JOIN tenants t ON u.user_id = t.user_id
+       JOIN contracts c ON c.tenant_id = t.tenant_id AND c.status = 'active'
+       WHERE u.is_active = 1 AND u.telegram_chat_id IS NOT NULL`
+    );
+    const total = rows[0]?.total ?? 0;
+
+    return sendSuccess(res, { sent: total, total }, `Broadcast sent to ${total} tenant(s)`);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
 
 

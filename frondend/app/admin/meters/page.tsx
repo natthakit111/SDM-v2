@@ -1,9 +1,15 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -11,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -20,337 +26,516 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
-import { Plus, Search, Gauge, Zap, Droplets, Pencil, Camera } from 'lucide-react'
-import { mockMeterReadings, mockRooms, MeterReading, formatDate, dormSettings } from '@/lib/mock-data'
-import { toast } from 'sonner'
-import { PhotoEvidenceUpload } from '@/components/meters/photo-evidence-upload'
+} from "@/components/ui/select";
+import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import {
+  Plus,
+  Search,
+  Gauge,
+  Zap,
+  Droplets,
+  Pencil,
+  Loader2,
+} from "lucide-react";
+import { meterAPI } from "@/lib/api/meter.api";
+import { roomAPI } from "@/lib/api/room.api";
+import { toast } from "sonner";
 
-const months = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-]
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface PhotoEvidence {
-  id: string
-  readingId: string
-  meterType: 'electricity' | 'water'
-  imageUrl: string
-  uploadedAt: string
-  fileName: string
+interface MeterReading {
+  reading_id: number;
+  room_id: number;
+  room_number: string;
+  meter_type: "electric" | "water";
+  reading_month: number;
+  reading_year: number;
+  previous_unit: number;
+  current_unit: number;
+  units_used: number;
+  rate_per_unit: number;
+  image_path: string | null;
+  recorded_at: string;
 }
 
+interface Room {
+  room_id: number;
+  room_number: string;
+}
+
+interface FormData {
+  room_id: string;
+  month: string;
+  year: string;
+  // ไฟ
+  elec_current: string;
+  elec_prev: string; // auto-filled จาก API
+  // น้ำ
+  water_current: string;
+  water_prev: string; // auto-filled จาก API
+  // รูป (optional)
+  elec_image: File | null;
+  water_image: File | null;
+}
+
+const emptyForm: FormData = {
+  room_id: "",
+  month: String(new Date().getMonth() + 1),
+  year: String(new Date().getFullYear()),
+  elec_current: "",
+  elec_prev: "0",
+  water_current: "",
+  water_prev: "0",
+  elec_image: null,
+  water_image: null,
+};
+
+const MONTHS = [
+  "",
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export default function MetersPage() {
-  const [readings, setReadings] = useState<MeterReading[]>(mockMeterReadings)
-  const [photos, setPhotos] = useState<PhotoEvidence[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [monthFilter, setMonthFilter] = useState<string>('all')
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false)
-  const [editingReading, setEditingReading] = useState<MeterReading | null>(null)
-  const [formData, setFormData] = useState({
-    roomId: '',
-    month: 'มีนาคม',
-    year: '2026',
-    electricityPrevious: '',
-    electricityCurrent: '',
-    waterPrevious: '',
-    waterCurrent: '',
-  })
+  const [readings, setReadings] = useState<MeterReading[]>([]);
+  const [occupiedRooms, setOccupiedRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingReading, setEditingReading] = useState<MeterReading | null>(
+    null,
+  );
+  const [formData, setFormData] = useState<FormData>(emptyForm);
+  const [loadingPrev, setLoadingPrev] = useState(false);
 
-  const occupiedRooms = mockRooms.filter(r => r.status === 'occupied')
-
-  const filteredReadings = readings.filter(reading => {
-    const matchesSearch = reading.roomNumber.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesMonth = monthFilter === 'all' || reading.month === monthFilter
-    return matchesSearch && matchesMonth
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    const room = mockRooms.find(r => r.id === formData.roomId)
-    if (!room) {
-      toast.error('กรุณาเลือกห้อง')
-      return
+  // ── Fetch readings ────────────────────────────────────────────────────────
+  const fetchReadings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (typeFilter !== "all") params.meter_type = typeFilter;
+      const res = await meterAPI.getAll(params);
+      setReadings(res.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลมิเตอร์ไม่สำเร็จ");
+    } finally {
+      setLoading(false);
     }
+  }, [typeFilter]);
 
-    const electricityUsed = parseInt(formData.electricityCurrent) - parseInt(formData.electricityPrevious)
-    const waterUsed = parseInt(formData.waterCurrent) - parseInt(formData.waterPrevious)
+  useEffect(() => {
+    fetchReadings();
+  }, [fetchReadings]);
 
-    if (electricityUsed < 0 || waterUsed < 0) {
-      toast.error('ค่ามิเตอร์ปัจจุบันต้องมากกว่าค่าก่อนหน้า')
-      return
+  useEffect(() => {
+    roomAPI
+      .getAll({ status: "occupied" })
+      .then((r) => setOccupiedRooms(r.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  // ── Auto-fill previous units เมื่อเลือกห้อง ──────────────────────────────
+  const handleRoomChange = async (roomId: string) => {
+    setFormData((p) => ({
+      ...p,
+      room_id: roomId,
+      elec_prev: "0",
+      water_prev: "0",
+    }));
+    if (!roomId) return;
+    setLoadingPrev(true);
+    try {
+      const [elec, water] = await Promise.all([
+        meterAPI
+          .getPreviousReading(roomId)
+          .then((r) => r.data?.previous_unit ?? 0),
+        meterAPI
+          .getPreviousReading(roomId + "?type=water")
+          .then((r) => r.data?.previous_unit ?? 0)
+          .catch(() => 0),
+      ]);
+      // Note: getPreviousReading ต้องส่ง type query — ใช้ getAll แทน
+      const [eRes, wRes] = await Promise.all([
+        meterAPI.getAll({ room_id: roomId, meter_type: "electric" }),
+        meterAPI.getAll({ room_id: roomId, meter_type: "water" }),
+      ]);
+      const eReadings = eRes.data ?? [];
+      const wReadings = wRes.data ?? [];
+      const latestE = eReadings[0]?.current_unit ?? 0;
+      const latestW = wReadings[0]?.current_unit ?? 0;
+      setFormData((p) => ({
+        ...p,
+        room_id: roomId,
+        elec_prev: String(latestE),
+        water_prev: String(latestW),
+      }));
+    } catch {
+      setFormData((p) => ({ ...p, room_id: roomId }));
+    } finally {
+      setLoadingPrev(false);
     }
+  };
 
-    if (editingReading) {
-      setReadings(prev => prev.map(reading => 
-        reading.id === editingReading.id
-          ? {
-              ...reading,
-              electricityPrevious: parseInt(formData.electricityPrevious),
-              electricityCurrent: parseInt(formData.electricityCurrent),
-              electricityUsed,
-              waterPrevious: parseInt(formData.waterPrevious),
-              waterCurrent: parseInt(formData.waterCurrent),
-              waterUsed,
-            }
-          : reading
-      ))
-      toast.success('อัปเดตข้อมูลมิเตอร์เรียบร้อย')
-    } else {
-      const newReading: MeterReading = {
-        id: Date.now().toString(),
-        roomId: formData.roomId,
-        roomNumber: room.number,
-        month: formData.month,
-        year: parseInt(formData.year),
-        electricityPrevious: parseInt(formData.electricityPrevious),
-        electricityCurrent: parseInt(formData.electricityCurrent),
-        electricityUsed,
-        waterPrevious: parseInt(formData.waterPrevious),
-        waterCurrent: parseInt(formData.waterCurrent),
-        waterUsed,
-        recordedAt: new Date().toISOString().split('T')[0],
-        recordedBy: 'admin',
+  // ── Filter ────────────────────────────────────────────────────────────────
+  const filteredReadings = readings.filter((r) => {
+    const q = searchQuery.toLowerCase();
+    const matchSearch = r.room_number?.toLowerCase().includes(q);
+    const matchMonth =
+      monthFilter === "all" || String(r.reading_month) === monthFilter;
+    return matchSearch && matchMonth;
+  });
+
+  // ── Submit: สร้าง 2 records (ไฟ + น้ำ) หรือ update 1 record ────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (editingReading) {
+        // Update mode: แก้แค่ record เดียว
+        const isElec = editingReading.meter_type === "electric";
+        const currentVal = isElec
+          ? formData.elec_current
+          : formData.water_current;
+        const imageFile = isElec ? formData.elec_image : formData.water_image;
+        await meterAPI.update(
+          editingReading.reading_id,
+          { current_unit: currentVal },
+          imageFile ?? undefined,
+        );
+        toast.success("อัปเดตมิเตอร์เรียบร้อย");
+      } else {
+        // Create mode: ส่ง 2 records
+        const base = {
+          room_id: formData.room_id,
+          reading_month: formData.month,
+          reading_year: formData.year,
+        };
+        await Promise.all([
+          meterAPI.create(
+            {
+              ...base,
+              meter_type: "electric",
+              current_unit: formData.elec_current,
+            },
+            formData.elec_image ?? undefined,
+          ),
+          meterAPI.create(
+            {
+              ...base,
+              meter_type: "water",
+              current_unit: formData.water_current,
+            },
+            formData.water_image ?? undefined,
+          ),
+        ]);
+        toast.success("บันทึกมิเตอร์เรียบร้อย");
       }
-      setReadings(prev => [...prev, newReading])
-      toast.success('บันทึกมิเตอร์เรียบร้อย')
+      resetForm();
+      fetchReadings();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "บันทึกมิเตอร์ไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
     }
-    
-    resetForm()
-  }
+  };
 
+  // ── Edit ──────────────────────────────────────────────────────────────────
   const handleEdit = (reading: MeterReading) => {
-    setEditingReading(reading)
-    setFormData({
-      roomId: reading.roomId,
-      month: reading.month,
-      year: reading.year.toString(),
-      electricityPrevious: reading.electricityPrevious.toString(),
-      electricityCurrent: reading.electricityCurrent.toString(),
-      waterPrevious: reading.waterPrevious.toString(),
-      waterCurrent: reading.waterCurrent.toString(),
-    })
-    setIsAddDialogOpen(true)
-  }
-
-  const handleViewPhotos = (reading: MeterReading) => {
-    setEditingReading(reading)
-    setIsPhotoDialogOpen(true)
-  }
-
-  const handlePhotoAdded = (photo: PhotoEvidence) => {
-    setPhotos(prev => [...prev, photo])
-  }
-
-  const handlePhotoDeleted = (photoId: string) => {
-    setPhotos(prev => prev.filter(p => p.id !== photoId))
-  }
+    setEditingReading(reading);
+    const isElec = reading.meter_type === "electric";
+    setFormData((p) => ({
+      ...p,
+      room_id: String(reading.room_id),
+      month: String(reading.reading_month),
+      year: String(reading.reading_year),
+      elec_current: isElec ? String(reading.current_unit) : p.elec_current,
+      elec_prev: isElec ? String(reading.previous_unit) : p.elec_prev,
+      water_current: !isElec ? String(reading.current_unit) : p.water_current,
+      water_prev: !isElec ? String(reading.previous_unit) : p.water_prev,
+    }));
+    setIsAddDialogOpen(true);
+  };
 
   const resetForm = () => {
-    setFormData({
-      roomId: '',
-      month: 'มีนาคม',
-      year: '2026',
-      electricityPrevious: '',
-      electricityCurrent: '',
-      waterPrevious: '',
-      waterCurrent: '',
-    })
-    setEditingReading(null)
-    setIsAddDialogOpen(false)
-  }
+    setFormData(emptyForm);
+    setEditingReading(null);
+    setIsAddDialogOpen(false);
+  };
 
+  const set =
+    (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setFormData((p) => ({ ...p, [field]: e.target.value }));
+
+  const currentYear = new Date().getFullYear();
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">บันทึกมิเตอร์</h1>
-          <p className="text-muted-foreground">บันทึกค่ามิเตอร์ไฟฟ้าและน้ำประปา</p>
+          <p className="text-muted-foreground">
+            บันทึกค่ามิเตอร์ไฟฟ้าและน้ำประปา
+          </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          if (!open) resetForm()
-          setIsAddDialogOpen(open)
-        }}>
+
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm();
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               บันทึกมิเตอร์
             </Button>
           </DialogTrigger>
+
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>{editingReading ? 'แก้ไขมิเตอร์' : 'บันทึกมิเตอร์ใหม่'}</DialogTitle>
+              <DialogTitle>
+                {editingReading ? "แก้ไขมิเตอร์" : "บันทึกมิเตอร์ใหม่"}
+              </DialogTitle>
               <DialogDescription>
-                {editingReading ? 'แก้ไขข้อมูลมิเตอร์' : 'กรอกค่ามิเตอร์ไฟฟ้าและน้ำประปา'}
+                {editingReading
+                  ? "แก้ไขค่ามิเตอร์"
+                  : "กรอกค่ามิเตอร์ไฟฟ้าและน้ำ (บันทึกพร้อมกัน)"}
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit}>
               <FieldGroup>
-                <div className="grid grid-cols-3 gap-4">
-                  <Field className="col-span-1">
-                    <FieldLabel htmlFor="roomId">ห้อง</FieldLabel>
+                {/* ห้อง / เดือน / ปี */}
+                <div className="grid grid-cols-3 gap-3">
+                  <Field>
+                    <FieldLabel>ห้อง</FieldLabel>
                     <Select
-                      value={formData.roomId}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, roomId: value }))}
+                      value={formData.room_id}
+                      onValueChange={handleRoomChange}
                       disabled={!!editingReading}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="เลือกห้อง" />
+                        <SelectValue placeholder="เลือก" />
                       </SelectTrigger>
                       <SelectContent>
-                        {occupiedRooms.map((room) => (
-                          <SelectItem key={room.id} value={room.id}>
-                            {room.number}
+                        {occupiedRooms.map((r) => (
+                          <SelectItem key={r.room_id} value={String(r.room_id)}>
+                            {r.room_number}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="month">เดือน</FieldLabel>
+                    <FieldLabel>เดือน</FieldLabel>
                     <Select
                       value={formData.month}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, month: value }))}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, month: v }))
+                      }
                       disabled={!!editingReading}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {months.map((month) => (
-                          <SelectItem key={month} value={month}>
-                            {month}
+                        {MONTHS.slice(1).map((m, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>
+                            {m}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="year">ปี</FieldLabel>
+                    <FieldLabel>ปี</FieldLabel>
                     <Select
                       value={formData.year}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, year: value }))}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, year: v }))
+                      }
                       disabled={!!editingReading}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2026">2026</SelectItem>
-                        <SelectItem value="2025">2025</SelectItem>
+                        {[currentYear, currentYear - 1].map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
 
-                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    มิเตอร์ไฟฟ้า
-                    <span className="text-muted-foreground ml-auto">(อัตรา {dormSettings.electricityRate} บาท/หน่วย)</span>
+                {loadingPrev && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    กำลังโหลดค่าก่อนหน้า...
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field>
-                      <FieldLabel htmlFor="electricityPrevious">เลขก่อนหน้า</FieldLabel>
-                      <Input
-                        id="electricityPrevious"
-                        type="number"
-                        value={formData.electricityPrevious}
-                        onChange={(e) => setFormData(prev => ({ ...prev, electricityPrevious: e.target.value }))}
-                        placeholder="0"
-                        required
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="electricityCurrent">เลขปัจจุบัน</FieldLabel>
-                      <Input
-                        id="electricityCurrent"
-                        type="number"
-                        value={formData.electricityCurrent}
-                        onChange={(e) => setFormData(prev => ({ ...prev, electricityCurrent: e.target.value }))}
-                        placeholder="0"
-                        required
-                      />
-                    </Field>
-                  </div>
-                </div>
+                )}
 
-                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Droplets className="h-4 w-4 text-blue-500" />
-                    มิเตอร์น้ำ
-                    <span className="text-muted-foreground ml-auto">(อัตรา {dormSettings.waterRate} บาท/หน่วย)</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                {/* ไฟฟ้า */}
+                {(!editingReading ||
+                  editingReading.meter_type === "electric") && (
+                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Zap className="h-4 w-4 text-yellow-500" />
+                      มิเตอร์ไฟฟ้า
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field>
+                        <FieldLabel htmlFor="elec_prev">เลขก่อนหน้า</FieldLabel>
+                        <Input
+                          id="elec_prev"
+                          type="number"
+                          value={formData.elec_prev}
+                          onChange={set("elec_prev")}
+                          placeholder="0"
+                          readOnly={!editingReading}
+                          className={!editingReading ? "bg-muted" : ""}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="elec_current">
+                          เลขปัจจุบัน *
+                        </FieldLabel>
+                        <Input
+                          id="elec_current"
+                          type="number"
+                          value={formData.elec_current}
+                          onChange={set("elec_current")}
+                          placeholder="0"
+                          required
+                        />
+                      </Field>
+                    </div>
                     <Field>
-                      <FieldLabel htmlFor="waterPrevious">เลขก่อนหน้า</FieldLabel>
+                      <FieldLabel>รูปมิเตอร์ไฟ (ไม่บังคับ)</FieldLabel>
                       <Input
-                        id="waterPrevious"
-                        type="number"
-                        value={formData.waterPrevious}
-                        onChange={(e) => setFormData(prev => ({ ...prev, waterPrevious: e.target.value }))}
-                        placeholder="0"
-                        required
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            elec_image: e.target.files?.[0] ?? null,
+                          }))
+                        }
                       />
                     </Field>
+                  </div>
+                )}
+
+                {/* น้ำ */}
+                {(!editingReading || editingReading.meter_type === "water") && (
+                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Droplets className="h-4 w-4 text-blue-500" />
+                      มิเตอร์น้ำ
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field>
+                        <FieldLabel htmlFor="water_prev">
+                          เลขก่อนหน้า
+                        </FieldLabel>
+                        <Input
+                          id="water_prev"
+                          type="number"
+                          value={formData.water_prev}
+                          onChange={set("water_prev")}
+                          placeholder="0"
+                          readOnly={!editingReading}
+                          className={!editingReading ? "bg-muted" : ""}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="water_current">
+                          เลขปัจจุบัน *
+                        </FieldLabel>
+                        <Input
+                          id="water_current"
+                          type="number"
+                          value={formData.water_current}
+                          onChange={set("water_current")}
+                          placeholder="0"
+                          required={!editingReading}
+                        />
+                      </Field>
+                    </div>
                     <Field>
-                      <FieldLabel htmlFor="waterCurrent">เลขปัจจุบัน</FieldLabel>
+                      <FieldLabel>รูปมิเตอร์น้ำ (ไม่บังคับ)</FieldLabel>
                       <Input
-                        id="waterCurrent"
-                        type="number"
-                        value={formData.waterCurrent}
-                        onChange={(e) => setFormData(prev => ({ ...prev, waterCurrent: e.target.value }))}
-                        placeholder="0"
-                        required
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            water_image: e.target.files?.[0] ?? null,
+                          }))
+                        }
                       />
                     </Field>
                   </div>
-                </div>
+                )}
               </FieldGroup>
+
               <DialogFooter className="mt-6">
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
                   ยกเลิก
                 </Button>
-                <Button type="submit">
-                  {editingReading ? 'บันทึก' : 'บันทึกมิเตอร์'}
+                <Button
+                  type="submit"
+                  disabled={submitting || !formData.room_id}
+                >
+                  {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {editingReading ? "บันทึก" : "บันทึกมิเตอร์"}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
-
-      {/* Photo Dialog */}
-      <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingReading ? `รูปมิเตอร์ห้อง ${editingReading.roomNumber}` : 'รูปมิเตอร์'}
-            </DialogTitle>
-            <DialogDescription>
-              จัดการรูปภาพหลักฐานของมิเตอร์
-            </DialogDescription>
-          </DialogHeader>
-          {editingReading && (
-            <PhotoEvidenceUpload
-              readingId={editingReading.id}
-              photos={photos.filter(p => p.readingId === editingReading.id)}
-              onPhotoAdded={handlePhotoAdded}
-              onPhotoDeleted={handlePhotoDeleted}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Filters */}
       <Card>
@@ -366,107 +551,128 @@ export default function MetersPage() {
               />
             </div>
             <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="w-full sm:w-48">
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="เดือนทั้งหมด" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">เดือนทั้งหมด</SelectItem>
-                {months.map((month) => (
-                  <SelectItem key={month} value={month}>
-                    {month}
+                {MONTHS.slice(1).map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {m}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกประเภท</SelectItem>
+                <SelectItem value="electric">ไฟฟ้า</SelectItem>
+                <SelectItem value="water">น้ำ</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Readings Table */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Gauge className="h-5 w-5" />
             รายการมิเตอร์
           </CardTitle>
-          <CardDescription>ทั้งหมด {filteredReadings.length} รายการ</CardDescription>
+          <CardDescription>
+            ทั้งหมด {filteredReadings.length} รายการ
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ห้อง</TableHead>
-                <TableHead>เดือน/ปี</TableHead>
-                <TableHead className="text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    ไฟฟ้า (หน่วย)
-                  </div>
-                </TableHead>
-                <TableHead className="text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <Droplets className="h-4 w-4 text-blue-500" />
-                    น้ำ (หน่วย)
-                  </div>
-                </TableHead>
-                <TableHead>บันทึกเมื่อ</TableHead>
-                <TableHead className="text-right">จัดการ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredReadings.map((reading) => (
-                <TableRow key={reading.id}>
-                  <TableCell className="font-medium">{reading.roomNumber}</TableCell>
-                  <TableCell>{reading.month} {reading.year}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">{reading.electricityPrevious}</span>
-                      {' → '}
-                      <span>{reading.electricityCurrent}</span>
-                      <span className="text-primary ml-2 font-medium">({reading.electricityUsed})</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">{reading.waterPrevious}</span>
-                      {' → '}
-                      <span>{reading.waterCurrent}</span>
-                      <span className="text-primary ml-2 font-medium">({reading.waterUsed})</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{formatDate(reading.recordedAt)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              กำลังโหลด...
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ห้อง</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>เดือน/ปี</TableHead>
+                  <TableHead className="text-center">
+                    ก่อนหน้า → ปัจจุบัน (ใช้)
+                  </TableHead>
+                  <TableHead className="text-right">อัตรา</TableHead>
+                  <TableHead>บันทึกเมื่อ</TableHead>
+                  <TableHead className="text-right">จัดการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredReadings.map((r) => (
+                  <TableRow key={r.reading_id}>
+                    <TableCell className="font-medium">
+                      {r.room_number}
+                    </TableCell>
+                    <TableCell>
+                      {r.meter_type === "electric" ? (
+                        <span className="flex items-center gap-1 text-yellow-500">
+                          <Zap className="h-3 w-3" />
+                          ไฟฟ้า
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-blue-500">
+                          <Droplets className="h-3 w-3" />
+                          น้ำ
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {MONTHS[r.reading_month]} {r.reading_year}
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      <span className="text-muted-foreground">
+                        {r.previous_unit}
+                      </span>
+                      {" → "}
+                      <span>{r.current_unit}</span>
+                      <span className="text-primary ml-2 font-medium">
+                        ({r.units_used})
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right text-sm">
+                      {r.rate_per_unit} บาท
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {formatDate(r.recorded_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleViewPhotos(reading)}
-                        title="ดูรูปภาพ"
-                      >
-                        <Camera className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(reading)}
+                        onClick={() => handleEdit(r)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredReadings.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    ไม่พบรายการมิเตอร์ที่ตรงกับการค้นหา
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredReadings.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      ไม่พบรายการมิเตอร์ที่ตรงกับการค้นหา
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

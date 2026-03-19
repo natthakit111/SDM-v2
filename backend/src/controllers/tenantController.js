@@ -2,7 +2,7 @@
  * controllers/tenantController.js
  */
 
-const bcrypt    = require('bcryptjs');
+const bcrypt    = require('bcrypt');
 const { validationResult } = require('express-validator');
 const { pool }  = require('../config/db');
 const UserModel   = require('../models/user.model');

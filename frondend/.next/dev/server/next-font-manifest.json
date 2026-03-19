@@ -20,6 +20,10 @@
       "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
       "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
     ],
+    "[project]/app/admin/notifications/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
     "[project]/app/admin/page": [
       "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
       "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
@@ -32,15 +36,11 @@
       "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
       "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
     ],
+    "[project]/app/admin/settings/page": [
+      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
+      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
+    ],
     "[project]/app/admin/tenants/page": [
-      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
-      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
-    ],
-    "[project]/app/login/page": [
-      "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
-      "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
-    ],
-    "[project]/app/page": [
       "static/media/bfd813093b8ca1bb-s.p.88bd3266.woff2",
       "static/media/f304c3cf3765fb5f-s.p.607a00cf.woff2"
     ]
