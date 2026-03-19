@@ -44,6 +44,10 @@ import {
   FileText,
   XCircle,
   Loader2,
+  Zap,
+  Droplets,
+  Camera,
+  ImageIcon,
 } from "lucide-react";
 import { billAPI } from "@/lib/api/bill.api";
 import { roomAPI } from "@/lib/api/room.api";
@@ -51,6 +55,16 @@ import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface MeterReading {
+  reading_id: number;
+  meter_type: "electric" | "water";
+  previous_unit: number;
+  current_unit: number;
+  units_used: number;
+  rate_per_unit: number;
+  image_path: string | null;
+}
 
 interface Bill {
   bill_id: number;
@@ -69,6 +83,8 @@ interface Bill {
   due_date: string;
   status: "pending" | "paid" | "overdue" | "cancelled";
   qr_payload: string | null;
+  // จาก getById
+  meter_readings?: MeterReading[];
 }
 
 interface Room {
@@ -123,6 +139,12 @@ const formatDate = (d: string) =>
     day: "numeric",
   });
 
+const imgUrl = (path: string | null) => {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return `${process.env.NEXT_PUBLIC_API_URL ?? ""}/${path}`;
+};
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function BillsPage() {
@@ -135,6 +157,7 @@ export default function BillsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [viewingBill, setViewingBill] = useState<Bill | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>(emptyForm);
 
   // ── Fetch bills ───────────────────────────────────────────────────────────
@@ -152,7 +175,6 @@ export default function BillsPage() {
     }
   }, [statusFilter]);
 
-  // ── Fetch occupied rooms for generate form ────────────────────────────────
   const fetchOccupiedRooms = async () => {
     try {
       const res = await roomAPI.getAll({ status: "occupied" });
@@ -169,7 +191,48 @@ export default function BillsPage() {
     fetchOccupiedRooms();
   }, []);
 
-  // ── Filter client-side ────────────────────────────────────────────────────
+  // ── View bill — โหลด meter_readings จาก getById (flat fields) ──────────────
+  const handleViewBill = async (bill: Bill) => {
+    setViewingBill(bill);
+    setDetailLoading(true);
+    try {
+      const res = await billAPI.getById(bill.bill_id);
+      const detail = res?.data ?? res;
+
+      // แปลง flat fields → meter_readings array
+      const meter_readings: MeterReading[] = [];
+      if (detail.elec_current != null) {
+        meter_readings.push({
+          reading_id: 0,
+          meter_type: "electric",
+          previous_unit: Number(detail.elec_previous ?? 0),
+          current_unit: Number(detail.elec_current),
+          units_used: Number(detail.elec_units ?? 0),
+          rate_per_unit: Number(detail.elec_rate ?? 0),
+          image_path: detail.elec_image ?? null,
+        });
+      }
+      if (detail.water_current != null) {
+        meter_readings.push({
+          reading_id: 0,
+          meter_type: "water",
+          previous_unit: Number(detail.water_previous ?? 0),
+          current_unit: Number(detail.water_current),
+          units_used: Number(detail.water_units ?? 0),
+          rate_per_unit: Number(detail.water_rate ?? 0),
+          image_path: detail.water_image ?? null,
+        });
+      }
+
+      setViewingBill({ ...bill, ...detail, meter_readings });
+    } catch {
+      // ใช้ข้อมูลเดิมถ้าโหลดไม่ได้
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // ── Filter ────────────────────────────────────────────────────────────────
   const filteredBills = bills.filter((b) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -224,6 +287,13 @@ export default function BillsPage() {
 
   const currentYear = new Date().getFullYear();
 
+  const elecReading = viewingBill?.meter_readings?.find(
+    (r) => r.meter_type === "electric",
+  );
+  const waterReading = viewingBill?.meter_readings?.find(
+    (r) => r.meter_type === "water",
+  );
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -247,7 +317,6 @@ export default function BillsPage() {
               สร้างบิล
             </Button>
           </DialogTrigger>
-
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>สร้างบิลใหม่</DialogTitle>
@@ -255,7 +324,6 @@ export default function BillsPage() {
                 เลือกห้องและเดือนเพื่อสร้างบิล (ต้องบันทึกมิเตอร์ก่อน)
               </DialogDescription>
             </DialogHeader>
-
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 <Field>
@@ -278,7 +346,6 @@ export default function BillsPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
                     <FieldLabel>เดือน</FieldLabel>
@@ -321,7 +388,6 @@ export default function BillsPage() {
                     </Select>
                   </Field>
                 </div>
-
                 <Field>
                   <FieldLabel htmlFor="other_amount">
                     ค่าใช้จ่ายอื่นๆ (บาท)
@@ -340,7 +406,6 @@ export default function BillsPage() {
                     min="0"
                   />
                 </Field>
-
                 <Field>
                   <FieldLabel htmlFor="due_date">
                     วันกำหนดชำระ (ไม่บังคับ)
@@ -355,7 +420,6 @@ export default function BillsPage() {
                   />
                 </Field>
               </FieldGroup>
-
               <DialogFooter className="mt-6">
                 <Button
                   type="button"
@@ -387,7 +451,7 @@ export default function BillsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t("bills.searchPlaceholder")}
+                placeholder="ค้นหาหมายเลขห้อง หรือชื่อผู้เช่า..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -461,7 +525,7 @@ export default function BillsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setViewingBill(bill)}
+                          onClick={() => handleViewBill(bill)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -501,7 +565,7 @@ export default function BillsPage() {
         open={!!viewingBill}
         onOpenChange={(open) => !open && setViewingBill(null)}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -525,17 +589,38 @@ export default function BillsPage() {
                 </div>
               </div>
 
+              {/* รายละเอียดค่าใช้จ่าย */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ค่าเช่า</span>
                   <span>{formatCurrency(viewingBill.rent_amount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">ค่าไฟฟ้า</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Zap className="h-3 w-3 text-yellow-500" />
+                    ค่าไฟฟ้า
+                    {elecReading && (
+                      <span className="text-xs ml-1">
+                        ({elecReading.previous_unit} →{" "}
+                        {elecReading.current_unit} = {elecReading.units_used}{" "}
+                        หน่วย × ฿{elecReading.rate_per_unit})
+                      </span>
+                    )}
+                  </span>
                   <span>{formatCurrency(viewingBill.electric_amount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">ค่าน้ำ</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Droplets className="h-3 w-3 text-blue-500" />
+                    ค่าน้ำ
+                    {waterReading && (
+                      <span className="text-xs ml-1">
+                        ({waterReading.previous_unit} →{" "}
+                        {waterReading.current_unit} = {waterReading.units_used}{" "}
+                        หน่วย × ฿{waterReading.rate_per_unit})
+                      </span>
+                    )}
+                  </span>
                   <span>{formatCurrency(viewingBill.water_amount)}</span>
                 </div>
                 {viewingBill.other_amount > 0 && (
@@ -550,11 +635,78 @@ export default function BillsPage() {
                 <span>รวมทั้งหมด</span>
                 <span>{formatCurrency(viewingBill.total_amount)}</span>
               </div>
-
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">กำหนดชำระภายใน</span>
                 <span>{formatDate(viewingBill.due_date)}</span>
               </div>
+
+              {/* รูปมิเตอร์ */}
+              {detailLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : elecReading?.image_path || waterReading?.image_path ? (
+                <div className="pt-4 border-t space-y-3">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    รูปหลักฐานมิเตอร์
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Zap className="h-3 w-3 text-yellow-500" />
+                        มิเตอร์ไฟฟ้า
+                      </p>
+                      {elecReading?.image_path ? (
+                        <a
+                          href={imgUrl(elecReading.image_path) ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={imgUrl(elecReading.image_path) ?? ""}
+                            alt="มิเตอร์ไฟ"
+                            className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
+                          <div className="text-center text-muted-foreground">
+                            <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                            <p className="text-xs">ไม่มีรูป</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Droplets className="h-3 w-3 text-blue-500" />
+                        มิเตอร์น้ำ
+                      </p>
+                      {waterReading?.image_path ? (
+                        <a
+                          href={imgUrl(waterReading.image_path) ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={imgUrl(waterReading.image_path) ?? ""}
+                            alt="มิเตอร์น้ำ"
+                            className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
+                          <div className="text-center text-muted-foreground">
+                            <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                            <p className="text-xs">ไม่มีรูป</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </DialogContent>

@@ -24,11 +24,23 @@ import {
   Zap,
   Droplets,
   Loader2,
+  ImageIcon,
+  Camera,
 } from "lucide-react";
 import Link from "next/link";
 import { billAPI } from "@/lib/api/bill.api";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
+
+interface MeterReading {
+  reading_id: number;
+  meter_type: "electric" | "water";
+  previous_unit: number;
+  current_unit: number;
+  units_used: number;
+  rate_per_unit: number;
+  image_path: string | null;
+}
 
 interface Bill {
   bill_id: number;
@@ -42,6 +54,8 @@ interface Bill {
   due_date: string;
   status: "pending" | "paid" | "overdue" | "cancelled";
   room_number: string;
+  // detail จาก getById
+  meter_readings?: MeterReading[];
 }
 
 const MONTHS = [
@@ -74,23 +88,79 @@ const fmtDate = (d: string) =>
     day: "numeric",
   });
 
+const imgUrl = (path: string | null) => {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return `${process.env.NEXT_PUBLIC_API_URL ?? ""}/${path}`;
+};
+
 export default function TenantBillsPage() {
   const { t } = useLanguage();
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewingBill, setViewingBill] = useState<Bill | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     billAPI
       .getMyBills()
-      .then((r) => setBills(r.data ?? []))
+      .then((r) => setBills(r.data ?? r ?? []))
       .catch(() => toast.error("โหลดบิลไม่สำเร็จ"))
       .finally(() => setLoading(false));
   }, []);
 
+  // เปิด dialog พร้อม load รายละเอียด + รูปมิเตอร์
+  // backend ส่ง flat fields: elec_image, elec_current ฯลฯ
+  const handleViewBill = async (bill: Bill) => {
+    setViewingBill(bill);
+    setDetailLoading(true);
+    try {
+      const res = await billAPI.getById(bill.bill_id);
+      const detail = res?.data ?? res;
+
+      // แปลง flat fields → meter_readings array
+      const meter_readings: MeterReading[] = [];
+      if (detail.elec_current != null) {
+        meter_readings.push({
+          reading_id: 0,
+          meter_type: "electric",
+          previous_unit: Number(detail.elec_previous ?? 0),
+          current_unit: Number(detail.elec_current),
+          units_used: Number(detail.elec_units ?? 0),
+          rate_per_unit: Number(detail.elec_rate ?? 0),
+          image_path: detail.elec_image ?? null,
+        });
+      }
+      if (detail.water_current != null) {
+        meter_readings.push({
+          reading_id: 0,
+          meter_type: "water",
+          previous_unit: Number(detail.water_previous ?? 0),
+          current_unit: Number(detail.water_current),
+          units_used: Number(detail.water_units ?? 0),
+          rate_per_unit: Number(detail.water_rate ?? 0),
+          image_path: detail.water_image ?? null,
+        });
+      }
+
+      setViewingBill({ ...bill, ...detail, meter_readings });
+    } catch {
+      // ใช้ข้อมูลเดิมถ้าโหลดไม่ได้
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const filtered = bills.filter(
     (b) => statusFilter === "all" || b.status === statusFilter,
+  );
+
+  const elecReading = viewingBill?.meter_readings?.find(
+    (r) => r.meter_type === "electric",
+  );
+  const waterReading = viewingBill?.meter_readings?.find(
+    (r) => r.meter_type === "water",
   );
 
   return (
@@ -163,7 +233,7 @@ export default function TenantBillsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setViewingBill(bill)}
+                        onClick={() => handleViewBill(bill)}
                       >
                         <FileText className="h-4 w-4 mr-1" /> รายละเอียด
                       </Button>
@@ -217,7 +287,7 @@ export default function TenantBillsPage() {
         open={!!viewingBill}
         onOpenChange={(open) => !open && setViewingBill(null)}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" /> ใบแจ้งหนี้
@@ -236,6 +306,8 @@ export default function TenantBillsPage() {
                 </div>
                 <BillStatusBadge status={viewingBill.status} />
               </div>
+
+              {/* รายละเอียดค่าใช้จ่าย */}
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ค่าเช่าห้อง</span>
@@ -247,6 +319,13 @@ export default function TenantBillsPage() {
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Zap className="h-3 w-3 text-yellow-500" />
                     ค่าไฟฟ้า
+                    {elecReading && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({elecReading.previous_unit} →{" "}
+                        {elecReading.current_unit} = {elecReading.units_used}{" "}
+                        หน่วย × ฿{elecReading.rate_per_unit})
+                      </span>
+                    )}
                   </span>
                   <span className="font-medium">
                     {fmt(viewingBill.electric_amount)}
@@ -256,6 +335,13 @@ export default function TenantBillsPage() {
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Droplets className="h-3 w-3 text-blue-500" />
                     ค่าน้ำ
+                    {waterReading && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({waterReading.previous_unit} →{" "}
+                        {waterReading.current_unit} = {waterReading.units_used}{" "}
+                        หน่วย × ฿{waterReading.rate_per_unit})
+                      </span>
+                    )}
                   </span>
                   <span className="font-medium">
                     {fmt(viewingBill.water_amount)}
@@ -270,6 +356,7 @@ export default function TenantBillsPage() {
                   </div>
                 )}
               </div>
+
               <div className="flex justify-between pt-4 border-t text-xl font-bold">
                 <span>รวมทั้งหมด</span>
                 <span className="text-primary">
@@ -280,6 +367,77 @@ export default function TenantBillsPage() {
                 <span className="text-muted-foreground">กำหนดชำระภายใน</span>
                 <span>{fmtDate(viewingBill.due_date)}</span>
               </div>
+
+              {/* รูปมิเตอร์ */}
+              {detailLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : elecReading?.image_path || waterReading?.image_path ? (
+                <div className="pt-4 border-t space-y-3">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    รูปหลักฐานมิเตอร์
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* รูปมิเตอร์ไฟ */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Zap className="h-3 w-3 text-yellow-500" />
+                        มิเตอร์ไฟฟ้า
+                      </p>
+                      {elecReading?.image_path ? (
+                        <a
+                          href={imgUrl(elecReading.image_path) ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={imgUrl(elecReading.image_path) ?? ""}
+                            alt="มิเตอร์ไฟ"
+                            className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
+                          <div className="text-center text-muted-foreground">
+                            <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                            <p className="text-xs">ไม่มีรูป</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* รูปมิเตอร์น้ำ */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Droplets className="h-3 w-3 text-blue-500" />
+                        มิเตอร์น้ำ
+                      </p>
+                      {waterReading?.image_path ? (
+                        <a
+                          href={imgUrl(waterReading.image_path) ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={imgUrl(waterReading.image_path) ?? ""}
+                            alt="มิเตอร์น้ำ"
+                            className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
+                          <div className="text-center text-muted-foreground">
+                            <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                            <p className="text-xs">ไม่มีรูป</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {(viewingBill.status === "pending" ||
                 viewingBill.status === "overdue") && (
                 <Link
