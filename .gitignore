@@ -19,8 +19,9 @@ pnpm-debug.log*
 # =========================
 dist/
 build/
-.next/       # Next.js build
-out/          # Next export
+.next/
+out/
+.vercel/
 
 # =========================
 # Logs
@@ -44,7 +45,7 @@ Thumbs.db
 # Cache
 # =========================
 .cache/
-.next/cache/
+*.tsbuildinfo
 
 # =========================
 # Backend specific
