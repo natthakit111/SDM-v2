@@ -1,0 +1,24 @@
+/**
+ * routes/moveOut.routes.js
+ * Base path: /api/move-out
+ */
+const express = require('express');
+const { body } = require('express-validator');
+const router = express.Router();
+const ctrl = require('../controllers/moveOutController');
+const { authenticate, authorizeRoles } = require('../middlewares/auth.middleware');
+
+const createValidation = [
+  body('move_out_date').isDate().withMessage('move_out_date must be a valid date'),
+  body('reason').trim().isLength({ min: 5 }).withMessage('Reason must be at least 5 characters'),
+];
+
+// Tenant: ดูของตัวเอง + ส่ง request ใหม่
+router.get('/',    authenticate, ctrl.getAll);
+router.post('/',   authenticate, authorizeRoles('tenant'), createValidation, ctrl.create);
+
+// Admin: อนุมัติ / ปฏิเสธ
+router.put('/:id/approve', authenticate, authorizeRoles('admin'), ctrl.approve);
+router.put('/:id/reject',  authenticate, authorizeRoles('admin'), ctrl.reject);
+
+module.exports = router;

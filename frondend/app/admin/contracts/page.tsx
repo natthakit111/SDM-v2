@@ -26,6 +26,7 @@ import { contractAPI } from "@/lib/api/contract.api";
 import { tenantAPI } from "@/lib/api/tenant.api";
 import { roomAPI } from "@/lib/api/room.api";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ const statusLabel: Record<string, { label: string; color: string }> = {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
+  const { t } = useLanguage();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [availableRooms, setAvailableRooms] = useState<any[]>([]);

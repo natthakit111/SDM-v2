@@ -9,12 +9,11 @@ export const maintenanceAPI = {
   getMyRequests: (params) =>
     api.get('/maintenance/my', { params }).then((r) => r.data),
 
-  // ⚠️ multipart/form-data (รูปภาพ optional)
+  // ⚠️ field ชื่อ `meter_image` (ใช้ uploadMeterImage middleware เดียวกัน)
   create: (data, imageFile) => {
     const form = new FormData();
-    // data: { category, description (min 10 chars), priority?: 'low'|'medium'|'high' }
     Object.entries(data).forEach(([k, v]) => form.append(k, v));
-    if (imageFile) form.append('image', imageFile);
+    if (imageFile) form.append('meter_image', imageFile); // ✅ แก้จาก 'image'
     return api.post('/maintenance', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);
@@ -33,7 +32,8 @@ export const maintenanceAPI = {
   getById: (id) =>
     api.get(`/maintenance/${id}`).then((r) => r.data),
 
-  updateStatus: (id, status) =>
-    api.put(`/maintenance/${id}/status`, { status }).then((r) => r.data),
-  // status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  // ✅ ส่ง status, admin_note, assigned_to ครบ
+  updateStatus: (id, data) =>
+    api.put(`/maintenance/${id}/status`, data).then((r) => r.data),
+  // data: { status, admin_note?, assigned_to? }
 };

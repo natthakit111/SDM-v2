@@ -1,7 +1,8 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useLanguage } from "@/context/language-context";
 import {
   Sidebar,
   SidebarContent,
@@ -12,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
-} from '@/components/ui/sidebar'
+} from "@/components/ui/sidebar";
 import {
   Building2,
   LayoutDashboard,
@@ -25,43 +26,62 @@ import {
   Megaphone,
   FileText,
   Settings,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-const menuItems = [
-  {
-    group: 'หลัก',
-    items: [
-      { title: 'แดชบอร์ด', href: '/admin', icon: LayoutDashboard },
-    ],
-  },
-  {
-    group: 'จัดการห้องพัก',
-    items: [
-      { title: 'ห้องพัก', href: '/admin/rooms', icon: DoorOpen },
-      { title: 'ผู้เช่า', href: '/admin/tenants', icon: Users },
-      { title: 'สัญญาเช่า', href: '/admin/contracts', icon: FileText },
-    ],
-  },
-  {
-    group: 'การเงิน',
-    items: [
-      { title: 'บันทึกมิเตอร์', href: '/admin/meters', icon: Gauge },
-      { title: 'บิล', href: '/admin/bills', icon: Receipt },
-      { title: 'การชำระเงิน', href: '/admin/payments', icon: CreditCard },
-    ],
-  },
-  {
-    group: 'อื่นๆ',
-    items: [
-      { title: 'แจ้งซ่อม', href: '/admin/maintenance', icon: Wrench },
-      { title: 'ประกาศ', href: '/admin/announcements', icon: Megaphone },
-    ],
-  },
-]
+  LogOut,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function AdminSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
+  const { t } = useLanguage();
+
+  const menuItems = [
+    {
+      group: t("menu.group.main"),
+      items: [
+        { title: t("menu.dashboard"), href: "/admin", icon: LayoutDashboard },
+      ],
+    },
+    {
+      group: t("menu.group.rooms"),
+      items: [
+        { title: t("menu.rooms"), href: "/admin/rooms", icon: DoorOpen },
+        { title: t("menu.tenants"), href: "/admin/tenants", icon: Users },
+        {
+          title: t("menu.contracts"),
+          href: "/admin/contracts",
+          icon: FileText,
+        },
+        { title: t("menu.moveOut"), href: "/admin/move-out", icon: LogOut },
+      ],
+    },
+    {
+      group: t("menu.group.finance"),
+      items: [
+        { title: t("menu.meters"), href: "/admin/meters", icon: Gauge },
+        { title: t("menu.bills"), href: "/admin/bills", icon: Receipt },
+        {
+          title: t("menu.payments"),
+          href: "/admin/payments",
+          icon: CreditCard,
+        },
+      ],
+    },
+    {
+      group: t("menu.group.other"),
+      items: [
+        {
+          title: t("menu.maintenance"),
+          href: "/admin/maintenance",
+          icon: Wrench,
+        },
+        {
+          title: t("menu.announcements"),
+          href: "/admin/announcements",
+          icon: Megaphone,
+        },
+      ],
+    },
+  ];
 
   return (
     <Sidebar>
@@ -76,23 +96,22 @@ export function AdminSidebar() {
           </div>
         </Link>
       </SidebarHeader>
+
       <SidebarContent>
         {menuItems.map((group) => (
           <SidebarGroup key={group.group}>
             <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
             <SidebarMenu>
               {group.items.map((item) => {
-                const isActive = pathname === item.href || 
-                  (item.href !== '/admin' && pathname.startsWith(item.href))
-                
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/admin" && pathname.startsWith(item.href));
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className={cn(
-                        isActive && 'bg-primary/20 text-primary'
-                      )}
+                      className={cn(isActive && "bg-primary/20 text-primary")}
                     >
                       <Link href={item.href}>
                         <item.icon className="h-4 w-4" />
@@ -100,24 +119,25 @@ export function AdminSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )
+                );
               })}
             </SidebarMenu>
           </SidebarGroup>
         ))}
       </SidebarContent>
+
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link href="/admin/settings">
                 <Settings className="h-4 w-4" />
-                <span>ตั้งค่า</span>
+                <span>{t("menu.settings")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

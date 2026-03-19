@@ -1,72 +1,119 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Bell, Trash2, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Bell, Trash2, CheckCircle2, Loader2 } from "lucide-react";
+import { billAPI } from "@/lib/api/bill.api";
+import { maintenanceAPI } from "@/lib/api/maintenance.api";
+import { announcementAPI } from "@/lib/api/announcement.api";
 
 interface Notification {
-  id: string
-  type: 'bill' | 'payment' | 'maintenance' | 'announcement'
-  title: string
-  message: string
-  timestamp: string
-  isRead: boolean
+  id: string;
+  type: "bill" | "maintenance" | "announcement";
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
 }
 
-const initialNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'bill',
-    title: 'บิลใหม่',
-    message: 'คุณมีบิลใหม่ราคา 5,500 บาท',
-    timestamp: '2 นาทีที่แล้ว',
-    isRead: false,
-  },
-  {
-    id: '2',
-    type: 'announcement',
-    title: 'ประกาศใหม่',
-    message: 'จะมีการซ่อมบำรุงประตูทางเข้า',
-    timestamp: '1 ชั่วโมงที่แล้ว',
-    isRead: false,
-  },
-  {
-    id: '3',
-    type: 'payment',
-    title: 'ยืนยันการชำระเงิน',
-    message: 'ระบบได้รับการชำระเงินของคุณแล้ว',
-    timestamp: '3 ชั่วโมงที่แล้ว',
-    isRead: true,
-  },
-]
+const typeEmoji: Record<string, string> = {
+  bill: "📄",
+  maintenance: "🔧",
+  announcement: "📢",
+};
+
+const typeColors: Record<string, string> = {
+  bill: "bg-blue-500/20 text-blue-400",
+  maintenance: "bg-yellow-500/20 text-yellow-400",
+  announcement: "bg-purple-500/20 text-purple-400",
+};
 
 export default function TenantNotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, isRead: true } : n
-    ))
-  }
+  // สร้าง notification จากข้อมูลจริง
+  useEffect(() => {
+    const build = async () => {
+      const items: Notification[] = [];
+      try {
+        const [billRes, maintRes, annRes] = await Promise.allSettled([
+          billAPI.getMyBills(),
+          maintenanceAPI.getMyRequests(),
+          announcementAPI.getAll(),
+        ]);
 
-  const handleDelete = (id: string) => {
-    setNotifications(notifications.filter(n => n.id !== id))
-  }
+        if (billRes.status === "fulfilled") {
+          const bills = billRes.value.data ?? [];
+          bills
+            .filter(
+              (b: any) => b.status === "pending" || b.status === "overdue",
+            )
+            .forEach((b: any) => {
+              items.push({
+                id: `bill-${b.bill_id}`,
+                type: "bill",
+                title: b.status === "overdue" ? "บิลเกินกำหนด!" : "บิลรอชำระ",
+                message: `บิลเดือน ${b.bill_month}/${b.bill_year} ยอด ${Number(b.total_amount).toLocaleString("th-TH")} บาท`,
+                timestamp: new Date(b.due_date).toLocaleDateString("th-TH"),
+                isRead: false,
+              });
+            });
+        }
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, isRead: true })))
-  }
+        if (maintRes.status === "fulfilled") {
+          const reqs = maintRes.value.data ?? [];
+          reqs
+            .filter((r: any) => r.status === "resolved")
+            .forEach((r: any) => {
+              items.push({
+                id: `maint-${r.request_id}`,
+                type: "maintenance",
+                title: "การซ่อมแซมเสร็จสิ้น",
+                message: `${r.category} — ดำเนินการเสร็จแล้ว`,
+                timestamp: new Date(r.created_at).toLocaleDateString("th-TH"),
+                isRead: true,
+              });
+            });
+        }
 
-  const unreadCount = notifications.filter(n => !n.isRead).length
+        if (annRes.status === "fulfilled") {
+          const anns = annRes.value.data ?? [];
+          anns.slice(0, 3).forEach((a: any) => {
+            items.push({
+              id: `ann-${a.announcement_id}`,
+              type: "announcement",
+              title: "ประกาศใหม่",
+              message: a.title,
+              timestamp: new Date(a.published_at).toLocaleDateString("th-TH"),
+              isRead: a.is_pinned !== 1,
+            });
+          });
+        }
+      } catch {
+        /* ไม่ทำอะไร */
+      }
 
-  const typeColors = {
-    bill: 'bg-blue-500/20 text-blue-400',
-    payment: 'bg-green-500/20 text-green-400',
-    maintenance: 'bg-yellow-500/20 text-yellow-400',
-    announcement: 'bg-purple-500/20 text-purple-400',
-  }
+      setNotifications(items);
+      setLoading(false);
+    };
+    build();
+  }, []);
+
+  const markRead = (id: string) =>
+    setNotifications((p) =>
+      p.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
+    );
+
+  const remove = (id: string) =>
+    setNotifications((p) => p.filter((n) => n.id !== id));
+
+  const markAllRead = () =>
+    setNotifications((p) => p.map((n) => ({ ...n, isRead: true })));
+
+  const unread = notifications.filter((n) => !n.isRead).length;
 
   return (
     <div className="space-y-6">
@@ -74,67 +121,62 @@ export default function TenantNotificationsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">แจ้งเตือน</h1>
           <p className="text-muted-foreground">
-            {unreadCount} รายการที่ยังไม่ได้อ่าน
+            {unread} รายการที่ยังไม่ได้อ่าน
           </p>
         </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" onClick={handleMarkAllAsRead}>
-            <CheckCircle2 className="w-4 h-4 mr-2" />
+        {unread > 0 && (
+          <Button variant="outline" onClick={markAllRead}>
+            <CheckCircle2 className="w-4 h-4 mr-2" />{" "}
             ทำเครื่องหมายว่าอ่านทั้งหมด
           </Button>
         )}
       </div>
 
-      <div className="space-y-3">
-        {notifications.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Bell className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
-              <p className="text-muted-foreground text-center">ไม่มีการแจ้งเตือน</p>
-            </CardContent>
-          </Card>
-        ) : (
-          notifications.map(notification => (
+      {loading ? (
+        <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+        </div>
+      ) : notifications.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Bell className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
+            <p className="text-muted-foreground">ไม่มีการแจ้งเตือน</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map((n) => (
             <div
-              key={notification.id}
-              className={`flex gap-4 p-4 rounded-lg border transition-all ${
-                notification.isRead
-                  ? 'bg-card/50 border-border'
-                  : 'bg-primary/5 border-primary/30'
-              }`}
+              key={n.id}
+              className={`flex gap-4 p-4 rounded-lg border transition-all ${n.isRead ? "bg-card/50 border-border" : "bg-primary/5 border-primary/30"}`}
             >
-              <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${typeColors[notification.type]}`}>
-                {notification.type === 'bill' && '📄'}
-                {notification.type === 'payment' && '✓'}
-                {notification.type === 'maintenance' && '🔧'}
-                {notification.type === 'announcement' && '📢'}
+              <div
+                className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${typeColors[n.type]}`}
+              >
+                {typeEmoji[n.type]}
               </div>
-
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-foreground">
-                      {notification.title}
-                      {!notification.isRead && (
-                        <Badge variant="secondary" className="ml-2 text-xs">ใหม่</Badge>
-                      )}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {notification.message}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {notification.timestamp}
-                    </p>
-                  </div>
-                </div>
+                <h3 className="font-semibold">
+                  {n.title}
+                  {!n.isRead && (
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      ใหม่
+                    </Badge>
+                  )}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {n.message}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {n.timestamp}
+                </p>
               </div>
-
               <div className="flex gap-2 flex-shrink-0">
-                {!notification.isRead && (
+                {!n.isRead && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleMarkAsRead(notification.id)}
+                    onClick={() => markRead(n.id)}
                     className="text-primary"
                   >
                     <CheckCircle2 className="w-4 h-4" />
@@ -143,16 +185,16 @@ export default function TenantNotificationsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleDelete(notification.id)}
+                  onClick={() => remove(n.id)}
                   className="text-destructive hover:text-destructive"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
-  )
+  );
 }

@@ -1,38 +1,97 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useAuth } from '@/context/auth-context'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { BillStatusBadge } from '@/components/common/status-badge'
-import { Receipt, FileText, CreditCard, Zap, Droplets } from 'lucide-react'
-import Link from 'next/link'
-import { mockBills, Bill, formatCurrency, formatDate } from '@/lib/mock-data'
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { BillStatusBadge } from "@/components/common/status-badge";
+import {
+  Receipt,
+  FileText,
+  CreditCard,
+  Zap,
+  Droplets,
+  Loader2,
+} from "lucide-react";
+import Link from "next/link";
+import { billAPI } from "@/lib/api/bill.api";
+import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
+
+interface Bill {
+  bill_id: number;
+  bill_month: number;
+  bill_year: number;
+  rent_amount: number;
+  electric_amount: number;
+  water_amount: number;
+  other_amount: number;
+  total_amount: number;
+  due_date: string;
+  status: "pending" | "paid" | "overdue" | "cancelled";
+  room_number: string;
+}
+
+const MONTHS = [
+  "",
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
 export default function TenantBillsPage() {
-  const { user } = useAuth()
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [viewingBill, setViewingBill] = useState<Bill | null>(null)
+  const { t } = useLanguage();
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [viewingBill, setViewingBill] = useState<Bill | null>(null);
 
-  // Get tenant's bills (mock: using room 101)
-  const tenantBills = mockBills.filter(b => b.roomNumber === (user?.roomNumber || '101'))
+  useEffect(() => {
+    billAPI
+      .getMyBills()
+      .then((r) => setBills(r.data ?? []))
+      .catch(() => toast.error("โหลดบิลไม่สำเร็จ"))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const filteredBills = tenantBills.filter(bill => {
-    return statusFilter === 'all' || bill.status === statusFilter
-  })
+  const filtered = bills.filter(
+    (b) => statusFilter === "all" || b.status === statusFilter,
+  );
 
   return (
     <div className="space-y-6">
@@ -54,169 +113,180 @@ export default function TenantBillsPage() {
         </Select>
       </div>
 
-      {/* Bills List */}
-      <div className="space-y-4">
-        {filteredBills.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>ไม่มีบิลที่ตรงกับการค้นหา</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredBills.map((bill) => (
-            <Card key={bill.id} className={bill.status === 'overdue' ? 'border-destructive/50' : ''}>
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>ไม่มีบิลที่ตรงกับการค้นหา</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((bill) => (
+            <Card
+              key={bill.bill_id}
+              className={
+                bill.status === "overdue" ? "border-destructive/50" : ""
+              }
+            >
               <CardContent className="p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${
-                      bill.status === 'paid' ? 'bg-success/20' : 
-                      bill.status === 'overdue' ? 'bg-destructive/20' : 
-                      'bg-warning/20'
-                    }`}>
-                      <Receipt className={`h-6 w-6 ${
-                        bill.status === 'paid' ? 'text-success' : 
-                        bill.status === 'overdue' ? 'text-destructive' : 
-                        'text-warning-foreground'
-                      }`} />
+                    <div
+                      className={`p-3 rounded-lg ${bill.status === "paid" ? "bg-green-500/20" : bill.status === "overdue" ? "bg-destructive/20" : "bg-yellow-500/20"}`}
+                    >
+                      <Receipt
+                        className={`h-6 w-6 ${bill.status === "paid" ? "text-green-500" : bill.status === "overdue" ? "text-destructive" : "text-yellow-600"}`}
+                      />
                     </div>
                     <div>
-                      <p className="font-medium text-lg">{bill.month} {bill.year}</p>
+                      <p className="font-medium text-lg">
+                        {MONTHS[bill.bill_month]} {bill.bill_year}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        กำหนดชำระ {formatDate(bill.dueDate)}
+                        กำหนดชำระ {fmtDate(bill.due_date)}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-2xl font-bold">{formatCurrency(bill.total)}</p>
+                      <p className="text-2xl font-bold">
+                        {fmt(bill.total_amount)}
+                      </p>
                       <BillStatusBadge status={bill.status} />
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setViewingBill(bill)}>
-                        <FileText className="h-4 w-4 mr-1" />
-                        รายละเอียด
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewingBill(bill)}
+                      >
+                        <FileText className="h-4 w-4 mr-1" /> รายละเอียด
                       </Button>
-                      {(bill.status === 'pending' || bill.status === 'overdue') && (
-                        <Link href={`/tenant/payment?bill=${bill.id}`}>
+                      {(bill.status === "pending" ||
+                        bill.status === "overdue") && (
+                        <Link href={`/tenant/payment?bill=${bill.bill_id}`}>
                           <Button size="sm">
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            ชำระเงิน
+                            <CreditCard className="h-4 w-4 mr-1" /> ชำระเงิน
                           </Button>
                         </Link>
                       )}
                     </div>
                   </div>
                 </div>
-
-                {/* Quick Summary */}
                 <div className="mt-4 pt-4 border-t flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <span className="text-muted-foreground">ค่าเช่า:</span>
-                    <span className="font-medium">{formatCurrency(bill.rent)}</span>
+                    <span className="font-medium">{fmt(bill.rent_amount)}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Zap className="h-4 w-4 text-yellow-500" />
                     <span className="text-muted-foreground">ไฟฟ้า:</span>
-                    <span className="font-medium">{formatCurrency(bill.electricityCost)}</span>
+                    <span className="font-medium">
+                      {fmt(bill.electric_amount)}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Droplets className="h-4 w-4 text-blue-500" />
                     <span className="text-muted-foreground">น้ำ:</span>
-                    <span className="font-medium">{formatCurrency(bill.waterCost)}</span>
+                    <span className="font-medium">
+                      {fmt(bill.water_amount)}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">ส่วนกลาง:</span>
-                    <span className="font-medium">{formatCurrency(bill.commonFee)}</span>
-                  </div>
+                  {bill.other_amount > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">อื่นๆ:</span>
+                      <span className="font-medium">
+                        {fmt(bill.other_amount)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* View Bill Dialog */}
-      <Dialog open={!!viewingBill} onOpenChange={(open) => !open && setViewingBill(null)}>
+      {/* Detail Dialog */}
+      <Dialog
+        open={!!viewingBill}
+        onOpenChange={(open) => !open && setViewingBill(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              ใบแจ้งหนี้
+              <FileText className="h-5 w-5" /> ใบแจ้งหนี้
             </DialogTitle>
           </DialogHeader>
           {viewingBill && (
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-4 border-b">
                 <div>
-                  <p className="font-medium text-lg">ห้อง {viewingBill.roomNumber}</p>
-                  <p className="text-sm text-muted-foreground">{viewingBill.tenantName}</p>
+                  <p className="font-medium text-lg">
+                    ห้อง {viewingBill.room_number}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {MONTHS[viewingBill.bill_month]} {viewingBill.bill_year}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">{viewingBill.month} {viewingBill.year}</p>
-                  <BillStatusBadge status={viewingBill.status} />
-                </div>
+                <BillStatusBadge status={viewingBill.status} />
               </div>
-              
-              <div className="space-y-3">
+              <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ค่าเช่าห้อง</span>
-                  <span className="font-medium">{formatCurrency(viewingBill.rent)}</span>
+                  <span className="font-medium">
+                    {fmt(viewingBill.rent_amount)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    ค่าไฟฟ้า ({viewingBill.electricityUnits} หน่วย x {viewingBill.electricityRate} บาท)
-                  </div>
-                  <span className="font-medium">{formatCurrency(viewingBill.electricityCost)}</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Zap className="h-3 w-3 text-yellow-500" />
+                    ค่าไฟฟ้า
+                  </span>
+                  <span className="font-medium">
+                    {fmt(viewingBill.electric_amount)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Droplets className="h-4 w-4 text-blue-500" />
-                    ค่าน้ำประปา ({viewingBill.waterUnits} หน่วย x {viewingBill.waterRate} บาท)
-                  </div>
-                  <span className="font-medium">{formatCurrency(viewingBill.waterCost)}</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Droplets className="h-3 w-3 text-blue-500" />
+                    ค่าน้ำ
+                  </span>
+                  <span className="font-medium">
+                    {fmt(viewingBill.water_amount)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ค่าส่วนกลาง</span>
-                  <span className="font-medium">{formatCurrency(viewingBill.commonFee)}</span>
-                </div>
-                {viewingBill.otherFees > 0 && (
+                {viewingBill.other_amount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      ค่าอื่นๆ {viewingBill.otherFeesDescription && `(${viewingBill.otherFeesDescription})`}
+                    <span className="text-muted-foreground">ค่าอื่นๆ</span>
+                    <span className="font-medium">
+                      {fmt(viewingBill.other_amount)}
                     </span>
-                    <span className="font-medium">{formatCurrency(viewingBill.otherFees)}</span>
-                  </div>
-                )}
-                {viewingBill.latePenalty > 0 && (
-                  <div className="flex justify-between text-destructive">
-                    <span>ค่าปรับล่าช้า</span>
-                    <span className="font-medium">{formatCurrency(viewingBill.latePenalty)}</span>
                   </div>
                 )}
               </div>
-
               <div className="flex justify-between pt-4 border-t text-xl font-bold">
                 <span>รวมทั้งหมด</span>
-                <span className="text-primary">{formatCurrency(viewingBill.total)}</span>
+                <span className="text-primary">
+                  {fmt(viewingBill.total_amount)}
+                </span>
               </div>
-
-              <div className="flex justify-between text-sm pt-2">
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">กำหนดชำระภายใน</span>
-                <span>{formatDate(viewingBill.dueDate)}</span>
+                <span>{fmtDate(viewingBill.due_date)}</span>
               </div>
-
-              {viewingBill.paidAt && (
-                <div className="flex justify-between text-sm text-success">
-                  <span>ชำระเมื่อ</span>
-                  <span>{formatDate(viewingBill.paidAt)}</span>
-                </div>
-              )}
-
-              {(viewingBill.status === 'pending' || viewingBill.status === 'overdue') && (
-                <Link href={`/tenant/payment?bill=${viewingBill.id}`} className="block">
-                  <Button className="w-full mt-4">
+              {(viewingBill.status === "pending" ||
+                viewingBill.status === "overdue") && (
+                <Link
+                  href={`/tenant/payment?bill=${viewingBill.bill_id}`}
+                  className="block"
+                >
+                  <Button className="w-full mt-2">
                     <CreditCard className="h-4 w-4 mr-2" />
                     ชำระเงิน
                   </Button>
@@ -227,5 +297,5 @@ export default function TenantBillsPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

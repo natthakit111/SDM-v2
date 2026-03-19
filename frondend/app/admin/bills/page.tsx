@@ -48,6 +48,7 @@ import {
 import { billAPI } from "@/lib/api/bill.api";
 import { roomAPI } from "@/lib/api/room.api";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ const formatDate = (d: string) =>
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function BillsPage() {
+  const { t } = useLanguage();
   const [bills, setBills] = useState<Bill[]>([]);
   const [occupiedRooms, setOccupiedRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -385,7 +387,7 @@ export default function BillsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาหมายเลขห้อง หรือชื่อผู้เช่า..."
+                placeholder={t("bills.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"

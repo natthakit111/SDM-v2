@@ -1,162 +1,198 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { useState, useEffect, useCallback } from "react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog'
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
-} from '@/components/ui/select'
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Megaphone, Pencil, Trash2, AlertCircle, Info, Bell, Loader2 } from 'lucide-react'
-import { announcementAPI } from '@/lib/api/announcement.api'
-import { toast } from 'sonner'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { Badge } from "@/components/ui/badge";
+import {
+  Plus,
+  Megaphone,
+  Pencil,
+  Trash2,
+  AlertCircle,
+  Info,
+  Bell,
+  Loader2,
+} from "lucide-react";
+import { announcementAPI } from "@/lib/api/announcement.api";
+import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Announcement {
-  announcement_id: number
-  title: string
-  content: string
-  target_audience: 'all' | 'admin' | 'tenant'
-  target_floor: number | null
-  is_pinned: number
-  published_by: number
-  published_at: string
-  expires_at: string | null
+  announcement_id: number;
+  title: string;
+  content: string;
+  target_audience: "all" | "admin" | "tenant";
+  target_floor: number | null;
+  is_pinned: number;
+  published_by: number;
+  published_at: string;
+  expires_at: string | null;
 }
 
 interface FormData {
-  title: string
-  content: string
-  target_audience: 'all' | 'admin' | 'tenant'
-  target_floor: string
-  is_pinned: boolean
-  expires_at: string
+  title: string;
+  content: string;
+  target_audience: "all" | "admin" | "tenant";
+  target_floor: string;
+  is_pinned: boolean;
+  expires_at: string;
 }
 
 const emptyForm: FormData = {
-  title: '',
-  content: '',
-  target_audience: 'all',
-  target_floor: '',
+  title: "",
+  content: "",
+  target_audience: "all",
+  target_floor: "",
   is_pinned: false,
-  expires_at: '',
-}
+  expires_at: "",
+};
 
 const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
 const audienceLabel: Record<string, string> = {
-  all: 'ทุกคน', admin: 'แอดมิน', tenant: 'ผู้เช่า',
-}
+  all: "ทุกคน",
+  admin: "แอดมิน",
+  tenant: "ผู้เช่า",
+};
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function AnnouncementsPage() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingAnn, setEditingAnn] = useState<Announcement | null>(null)
-  const [formData, setFormData] = useState<FormData>(emptyForm)
+  const { t } = useLanguage();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchAnnouncements = useCallback(async () => {
     try {
-      setLoading(true)
-      const res = await announcementAPI.getAll()
-      setAnnouncements(res.data ?? [])
+      setLoading(true);
+      const res = await announcementAPI.getAll();
+      setAnnouncements(res.data ?? []);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ')
+      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลไม่สำเร็จ");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
-  useEffect(() => { fetchAnnouncements() }, [fetchAnnouncements])
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
+    e.preventDefault();
+    setSubmitting(true);
     try {
       const payload: any = {
-        title:           formData.title,
-        content:         formData.content,
+        title: formData.title,
+        content: formData.content,
         target_audience: formData.target_audience,
-        is_pinned:       formData.is_pinned ? 1 : 0,
-      }
-      if (formData.target_floor) payload.target_floor = parseInt(formData.target_floor)
-      if (formData.expires_at)   payload.expires_at   = formData.expires_at
+        is_pinned: formData.is_pinned ? 1 : 0,
+      };
+      if (formData.target_floor)
+        payload.target_floor = parseInt(formData.target_floor);
+      if (formData.expires_at) payload.expires_at = formData.expires_at;
 
       if (editingAnn) {
-        await announcementAPI.update(editingAnn.announcement_id, payload)
-        toast.success('อัปเดตประกาศเรียบร้อย')
+        await announcementAPI.update(editingAnn.announcement_id, payload);
+        toast.success("อัปเดตประกาศเรียบร้อย");
       } else {
-        await announcementAPI.create(payload)
-        toast.success('สร้างประกาศใหม่เรียบร้อย')
+        await announcementAPI.create(payload);
+        toast.success("สร้างประกาศใหม่เรียบร้อย");
       }
-      resetForm()
-      fetchAnnouncements()
+      resetForm();
+      fetchAnnouncements();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'เกิดข้อผิดพลาด')
+      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   const handleEdit = (ann: Announcement) => {
-    setEditingAnn(ann)
+    setEditingAnn(ann);
     setFormData({
-      title:           ann.title,
-      content:         ann.content,
+      title: ann.title,
+      content: ann.content,
       target_audience: ann.target_audience,
-      target_floor:    ann.target_floor ? String(ann.target_floor) : '',
-      is_pinned:       ann.is_pinned === 1,
-      expires_at:      ann.expires_at ? ann.expires_at.split('T')[0] : '',
-    })
-    setIsAddDialogOpen(true)
-  }
+      target_floor: ann.target_floor ? String(ann.target_floor) : "",
+      is_pinned: ann.is_pinned === 1,
+      expires_at: ann.expires_at ? ann.expires_at.split("T")[0] : "",
+    });
+    setIsAddDialogOpen(true);
+  };
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (ann: Announcement) => {
-    if (!confirm(`ต้องการลบประกาศ "${ann.title}" หรือไม่?`)) return
+    if (!confirm(`ต้องการลบประกาศ "${ann.title}" หรือไม่?`)) return;
     try {
-      await announcementAPI.delete(ann.announcement_id)
-      toast.success('ลบประกาศเรียบร้อย')
-      fetchAnnouncements()
+      await announcementAPI.delete(ann.announcement_id);
+      toast.success("ลบประกาศเรียบร้อย");
+      fetchAnnouncements();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'ลบไม่สำเร็จ')
+      toast.error(err?.response?.data?.message ?? "ลบไม่สำเร็จ");
     }
-  }
+  };
 
   const resetForm = () => {
-    setFormData(emptyForm)
-    setEditingAnn(null)
-    setIsAddDialogOpen(false)
-  }
+    setFormData(emptyForm);
+    setEditingAnn(null);
+    setIsAddDialogOpen(false);
+  };
 
-  const set = (field: keyof FormData) =>
+  const set =
+    (field: keyof FormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setFormData(p => ({ ...p, [field]: e.target.value }))
+      setFormData((p) => ({ ...p, [field]: e.target.value }));
 
   const getPriorityIcon = (ann: Announcement) => {
-    if (ann.is_pinned) return <Bell className="h-5 w-5 text-yellow-500" />
-    if (ann.target_audience === 'admin') return <AlertCircle className="h-5 w-5 text-destructive" />
-    return <Info className="h-5 w-5 text-primary" />
-  }
+    if (ann.is_pinned) return <Bell className="h-5 w-5 text-yellow-500" />;
+    if (ann.target_audience === "admin")
+      return <AlertCircle className="h-5 w-5 text-destructive" />;
+    return <Info className="h-5 w-5 text-primary" />;
+  };
 
   const isExpired = (ann: Announcement) =>
-    ann.expires_at ? new Date(ann.expires_at) < new Date() : false
+    ann.expires_at ? new Date(ann.expires_at) < new Date() : false;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -165,13 +201,18 @@ export default function AnnouncementsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">ประกาศข่าวสาร</h1>
-          <p className="text-muted-foreground">สร้างและจัดการประกาศสำหรับผู้เช่า</p>
+          <p className="text-muted-foreground">
+            สร้างและจัดการประกาศสำหรับผู้เช่า
+          </p>
         </div>
 
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          if (!open) resetForm()
-          setIsAddDialogOpen(open)
-        }}>
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm();
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -181,9 +222,13 @@ export default function AnnouncementsPage() {
 
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>{editingAnn ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}</DialogTitle>
+              <DialogTitle>
+                {editingAnn ? "แก้ไขประกาศ" : "สร้างประกาศใหม่"}
+              </DialogTitle>
               <DialogDescription>
-                {editingAnn ? 'แก้ไขข้อมูลประกาศ' : 'กรอกข้อมูลเพื่อสร้างประกาศใหม่'}
+                {editingAnn
+                  ? "แก้ไขข้อมูลประกาศ"
+                  : "กรอกข้อมูลเพื่อสร้างประกาศใหม่"}
               </DialogDescription>
             </DialogHeader>
 
@@ -191,22 +236,42 @@ export default function AnnouncementsPage() {
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="title">หัวข้อประกาศ</FieldLabel>
-                  <Input id="title" value={formData.title} onChange={set('title')}
-                    placeholder="เช่น แจ้งปิดน้ำชั่วคราว" required />
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={set("title")}
+                    placeholder="เช่น แจ้งปิดน้ำชั่วคราว"
+                    required
+                  />
                 </Field>
 
                 <Field>
                   <FieldLabel htmlFor="content">เนื้อหา</FieldLabel>
-                  <Textarea id="content" value={formData.content} onChange={set('content')}
-                    placeholder="รายละเอียดประกาศ..." rows={5} required />
+                  <Textarea
+                    id="content"
+                    value={formData.content}
+                    onChange={set("content")}
+                    placeholder="รายละเอียดประกาศ..."
+                    rows={5}
+                    required
+                  />
                 </Field>
 
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
                     <FieldLabel>กลุ่มเป้าหมาย</FieldLabel>
-                    <Select value={formData.target_audience}
-                      onValueChange={v => setFormData(p => ({ ...p, target_audience: v as FormData['target_audience'] }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={formData.target_audience}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({
+                          ...p,
+                          target_audience: v as FormData["target_audience"],
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">ทุกคน</SelectItem>
                         <SelectItem value="tenant">ผู้เช่าเท่านั้น</SelectItem>
@@ -215,23 +280,44 @@ export default function AnnouncementsPage() {
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="target_floor">เฉพาะชั้น (ถ้ามี)</FieldLabel>
-                    <Input id="target_floor" type="number" value={formData.target_floor}
-                      onChange={set('target_floor')} placeholder="ทุกชั้น" min="1" max="10" />
+                    <FieldLabel htmlFor="target_floor">
+                      เฉพาะชั้น (ถ้ามี)
+                    </FieldLabel>
+                    <Input
+                      id="target_floor"
+                      type="number"
+                      value={formData.target_floor}
+                      onChange={set("target_floor")}
+                      placeholder="ทุกชั้น"
+                      min="1"
+                      max="10"
+                    />
                   </Field>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="expires_at">วันหมดอายุ (ถ้ามี)</FieldLabel>
-                    <Input id="expires_at" type="date" value={formData.expires_at}
-                      onChange={set('expires_at')} />
+                    <FieldLabel htmlFor="expires_at">
+                      วันหมดอายุ (ถ้ามี)
+                    </FieldLabel>
+                    <Input
+                      id="expires_at"
+                      type="date"
+                      value={formData.expires_at}
+                      onChange={set("expires_at")}
+                    />
                   </Field>
                   <Field>
                     <FieldLabel>ปักหมุด</FieldLabel>
-                    <Select value={formData.is_pinned ? 'yes' : 'no'}
-                      onValueChange={v => setFormData(p => ({ ...p, is_pinned: v === 'yes' }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={formData.is_pinned ? "yes" : "no"}
+                      onValueChange={(v) =>
+                        setFormData((p) => ({ ...p, is_pinned: v === "yes" }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="no">ไม่ปักหมุด</SelectItem>
                         <SelectItem value="yes">ปักหมุด</SelectItem>
@@ -242,12 +328,19 @@ export default function AnnouncementsPage() {
               </FieldGroup>
 
               <DialogFooter className="mt-6">
-                <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
                   ยกเลิก
                 </Button>
                 <Button type="submit" disabled={submitting}>
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {editingAnn ? 'บันทึก' : 'สร้างประกาศ'}
+                  {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {editingAnn ? "บันทึก" : "สร้างประกาศ"}
                 </Button>
               </DialogFooter>
             </form>
@@ -270,9 +363,11 @@ export default function AnnouncementsPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {announcements.map(ann => (
-            <Card key={ann.announcement_id}
-              className={`transition-opacity ${isExpired(ann) ? 'opacity-50' : ''}`}>
+          {announcements.map((ann) => (
+            <Card
+              key={ann.announcement_id}
+              className={`transition-opacity ${isExpired(ann) ? "opacity-50" : ""}`}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -282,15 +377,26 @@ export default function AnnouncementsPage() {
                       <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
                         <span>{formatDate(ann.published_at)}</span>
                         <span>•</span>
-                        <span>{audienceLabel[ann.target_audience] ?? ann.target_audience}</span>
-                        {ann.target_floor && <span>• ชั้น {ann.target_floor}</span>}
-                        {ann.expires_at && <span>• หมดอายุ {formatDate(ann.expires_at)}</span>}
+                        <span>
+                          {audienceLabel[ann.target_audience] ??
+                            ann.target_audience}
+                        </span>
+                        {ann.target_floor && (
+                          <span>• ชั้น {ann.target_floor}</span>
+                        )}
+                        {ann.expires_at && (
+                          <span>• หมดอายุ {formatDate(ann.expires_at)}</span>
+                        )}
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {ann.is_pinned === 1 && <Badge variant="default">ปักหมุด</Badge>}
-                    {isExpired(ann) && <Badge variant="secondary">หมดอายุ</Badge>}
+                    {ann.is_pinned === 1 && (
+                      <Badge variant="default">ปักหมุด</Badge>
+                    )}
+                    {isExpired(ann) && (
+                      <Badge variant="secondary">หมดอายุ</Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -299,13 +405,20 @@ export default function AnnouncementsPage() {
                   {ann.content}
                 </p>
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(ann)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(ann)}
+                  >
                     <Pencil className="h-4 w-4 mr-1" />
                     แก้ไข
                   </Button>
-                  <Button variant="ghost" size="sm"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(ann)}>
+                    onClick={() => handleDelete(ann)}
+                  >
                     <Trash2 className="h-4 w-4 mr-1" />
                     ลบ
                   </Button>
@@ -316,5 +429,5 @@ export default function AnnouncementsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

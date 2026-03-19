@@ -1,9 +1,19 @@
-'use client'
+"use client";
 
-import { useAuth } from '@/context/auth-context'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { BillStatusBadge, MaintenanceStatusBadge } from '@/components/common/status-badge'
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/auth-context";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  BillStatusBadge,
+  MaintenanceStatusBadge,
+} from "@/components/common/status-badge";
 import {
   DoorOpen,
   Receipt,
@@ -13,82 +23,215 @@ import {
   Calendar,
   ArrowRight,
   AlertTriangle,
-} from 'lucide-react'
-import Link from 'next/link'
-import {
-  mockBills,
-  mockMaintenanceRequests,
-  mockAnnouncements,
-  mockRooms,
-  mockContracts,
-  formatCurrency,
-  formatDate,
-} from '@/lib/mock-data'
+  Loader2,
+} from "lucide-react";
+import Link from "next/link";
+import { billAPI } from "@/lib/api/bill.api";
+import { maintenanceAPI } from "@/lib/api/maintenance.api";
+import { announcementAPI } from "@/lib/api/announcement.api";
+import { contractAPI } from "@/lib/api/contract.api";
+import { useLanguage } from "@/context/language-context";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface Bill {
+  bill_id: number;
+  bill_month: number;
+  bill_year: number;
+  total_amount: number;
+  due_date: string;
+  status: "pending" | "paid" | "overdue" | "cancelled";
+}
+
+interface MaintenanceRequest {
+  request_id: number;
+  category: string;
+  status: string;
+  created_at: string;
+}
+
+interface Announcement {
+  announcement_id: number;
+  title: string;
+  content: string;
+  published_at: string;
+  is_pinned: number;
+}
+
+interface Contract {
+  contract_id: number;
+  room_number: string;
+  room_id: number;
+  start_date: string;
+  end_date: string;
+  rent_amount: number;
+  deposit_amount: number;
+  status: string;
+}
+
+const MONTHS = [
+  "",
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function TenantDashboard() {
-  const { user } = useAuth()
+  const { t } = useLanguage();
+  const { user } = useAuth();
 
-  // Get tenant's data (mock: using room 101)
-  const tenantRoom = mockRooms.find(r => r.number === (user?.roomNumber || '101'))
-  const tenantBills = mockBills.filter(b => b.roomNumber === (user?.roomNumber || '101'))
-  const tenantMaintenance = mockMaintenanceRequests.filter(m => m.roomNumber === (user?.roomNumber || '101'))
-  const activeAnnouncements = mockAnnouncements.filter(a => a.isActive)
-  const tenantContract = mockContracts.find(c => c.roomId === tenantRoom?.id)
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [maintenance, setMaintenance] = useState<MaintenanceRequest[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const pendingBill = tenantBills.find(b => b.status === 'pending' || b.status === 'overdue')
-  const activeMaintenance = tenantMaintenance.filter(m => m.status !== 'completed' && m.status !== 'cancelled')
+  // ── Fetch all data ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        setLoading(true);
+        const [billRes, maintRes, annRes, contractRes] =
+          await Promise.allSettled([
+            billAPI.getMyBills(),
+            maintenanceAPI.getMyRequests(),
+            announcementAPI.getAll(),
+            contractAPI.getMyContract(),
+          ]);
+
+        if (billRes.status === "fulfilled") setBills(billRes.value.data ?? []);
+        if (maintRes.status === "fulfilled")
+          setMaintenance(maintRes.value.data ?? []);
+        if (annRes.status === "fulfilled")
+          setAnnouncements(annRes.value.data ?? []);
+        if (contractRes.status === "fulfilled")
+          setContract(contractRes.value.data ?? null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const pendingBill = bills.find(
+    (b) => b.status === "pending" || b.status === "overdue",
+  );
+  const activeMaintenance = maintenance.filter(
+    (m) => m.status !== "resolved" && m.status !== "cancelled",
+  );
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 gap-2 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        กำลังโหลด...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">สวัสดี, {user?.name || 'ผู้เช่า'}</h1>
+        <h1 className="text-2xl font-bold">
+          สวัสดี, {user?.username || "ผู้เช่า"}
+        </h1>
         <p className="text-muted-foreground">ยินดีต้อนรับสู่ระบบจัดการหอพัก</p>
       </div>
 
       {/* Room Info Card */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-4 rounded-xl bg-primary/20">
-                <DoorOpen className="h-8 w-8 text-primary" />
+      {contract && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-4 rounded-xl bg-primary/20">
+                  <DoorOpen className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ห้องพักของคุณ</p>
+                  <p className="text-3xl font-bold">{contract.room_number}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    สัญญาถึง {formatDate(contract.end_date)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">ห้องพักของคุณ</p>
-                <p className="text-3xl font-bold">{user?.roomNumber || '101'}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  ชั้น {tenantRoom?.floor || 1} • {tenantRoom?.type === 'standard' ? 'ห้องมาตรฐาน' : tenantRoom?.type === 'deluxe' ? 'ห้องดีลักซ์' : 'ห้องสวีท'}
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatCurrency(Number(contract.rent_amount))}
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(tenantRoom?.monthlyRent || 4500)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pending Bill Alert */}
       {pendingBill && (
-        <Card className={pendingBill.status === 'overdue' ? 'border-destructive/50 bg-destructive/5' : 'border-warning/50 bg-warning/5'}>
+        <Card
+          className={
+            pendingBill.status === "overdue"
+              ? "border-destructive/50 bg-destructive/5"
+              : "border-yellow-500/50 bg-yellow-500/5"
+          }
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${pendingBill.status === 'overdue' ? 'bg-destructive/20' : 'bg-warning/20'}`}>
-                  <AlertTriangle className={`h-5 w-5 ${pendingBill.status === 'overdue' ? 'text-destructive' : 'text-warning-foreground'}`} />
+                <div
+                  className={`p-2 rounded-lg ${pendingBill.status === "overdue" ? "bg-destructive/20" : "bg-yellow-500/20"}`}
+                >
+                  <AlertTriangle
+                    className={`h-5 w-5 ${pendingBill.status === "overdue" ? "text-destructive" : "text-yellow-600"}`}
+                  />
                 </div>
                 <div>
-                  <h3 className={`font-semibold ${pendingBill.status === 'overdue' ? 'text-destructive' : 'text-warning-foreground'}`}>
-                    {pendingBill.status === 'overdue' ? 'บิลเกินกำหนดชำระ!' : 'คุณมีบิลที่รอชำระ'}
+                  <h3
+                    className={`font-semibold ${pendingBill.status === "overdue" ? "text-destructive" : ""}`}
+                  >
+                    {pendingBill.status === "overdue"
+                      ? "บิลเกินกำหนดชำระ!"
+                      : "คุณมีบิลที่รอชำระ"}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {pendingBill.month} {pendingBill.year} • ยอด {formatCurrency(pendingBill.total)}
+                    {MONTHS[pendingBill.bill_month]} {pendingBill.bill_year} •
+                    ยอด {formatCurrency(pendingBill.total_amount)}
                   </p>
                 </div>
               </div>
               <Link href="/tenant/payment">
-                <Button variant={pendingBill.status === 'overdue' ? 'destructive' : 'default'}>
+                <Button
+                  variant={
+                    pendingBill.status === "overdue" ? "destructive" : "default"
+                  }
+                >
                   ชำระเงิน
                 </Button>
               </Link>
@@ -99,41 +242,24 @@ export default function TenantDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link href="/tenant/bills">
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 text-center">
-              <Receipt className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">ดูบิล</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/tenant/payment">
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 text-center">
-              <CreditCard className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">ชำระเงิน</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/tenant/maintenance">
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 text-center">
-              <Wrench className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">แจ้งซ่อม</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/tenant/contract">
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 text-center">
-              <Calendar className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">สัญญาเช่า</p>
-            </CardContent>
-          </Card>
-        </Link>
+        {[
+          { href: "/tenant/bills", icon: Receipt, label: "ดูบิล" },
+          { href: "/tenant/payment", icon: CreditCard, label: "ชำระเงิน" },
+          { href: "/tenant/maintenance", icon: Wrench, label: "แจ้งซ่อม" },
+          { href: "/tenant/contract", icon: Calendar, label: "สัญญาเช่า" },
+        ].map(({ href, icon: Icon, label }) => (
+          <Link key={href} href={href}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <Icon className="h-8 w-8 mx-auto mb-2 text-primary" />
+                <p className="font-medium">{label}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
 
-      {/* Main Content */}
+      {/* Bills + Maintenance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Bills */}
         <Card>
@@ -144,35 +270,43 @@ export default function TenantDashboard() {
             </div>
             <Link href="/tenant/bills">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด
-                <ArrowRight className="ml-2 h-4 w-4" />
+                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {tenantBills.slice(0, 3).map((bill) => (
-                <div key={bill.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              {bills.slice(0, 3).map((bill) => (
+                <div
+                  key={bill.bill_id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
                   <div>
-                    <p className="font-medium">{bill.month} {bill.year}</p>
+                    <p className="font-medium">
+                      {MONTHS[bill.bill_month]} {bill.bill_year}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      กำหนดชำระ {formatDate(bill.dueDate)}
+                      กำหนดชำระ {formatDate(bill.due_date)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{formatCurrency(bill.total)}</p>
+                    <p className="font-medium">
+                      {formatCurrency(bill.total_amount)}
+                    </p>
                     <BillStatusBadge status={bill.status} />
                   </div>
                 </div>
               ))}
-              {tenantBills.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">ไม่มีบิล</p>
+              {bills.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">
+                  ไม่มีบิล
+                </p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Maintenance Requests */}
+        {/* Maintenance */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -181,26 +315,30 @@ export default function TenantDashboard() {
             </div>
             <Link href="/tenant/maintenance">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด
-                <ArrowRight className="ml-2 h-4 w-4" />
+                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {tenantMaintenance.slice(0, 3).map((request) => (
-                <div key={request.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              {maintenance.slice(0, 3).map((req) => (
+                <div
+                  key={req.request_id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
                   <div>
-                    <p className="font-medium">{request.title}</p>
+                    <p className="font-medium">{req.category}</p>
                     <p className="text-sm text-muted-foreground">
-                      แจ้งเมื่อ {formatDate(request.createdAt)}
+                      แจ้งเมื่อ {formatDate(req.created_at)}
                     </p>
                   </div>
-                  <MaintenanceStatusBadge status={request.status} />
+                  <MaintenanceStatusBadge status={req.status} />
                 </div>
               ))}
-              {tenantMaintenance.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">ไม่มีรายการแจ้งซ่อม</p>
+              {maintenance.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">
+                  ไม่มีรายการแจ้งซ่อม
+                </p>
               )}
             </div>
           </CardContent>
@@ -208,7 +346,7 @@ export default function TenantDashboard() {
       </div>
 
       {/* Announcements */}
-      {activeAnnouncements.length > 0 && (
+      {announcements.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -218,22 +356,18 @@ export default function TenantDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {activeAnnouncements.slice(0, 2).map((announcement) => (
-                <div 
-                  key={announcement.id} 
-                  className={`p-4 rounded-lg ${
-                    announcement.priority === 'urgent' 
-                      ? 'bg-destructive/10 border border-destructive/30' 
-                      : announcement.priority === 'important'
-                      ? 'bg-warning/10 border border-warning/30'
-                      : 'bg-muted/50'
-                  }`}
+              {announcements.slice(0, 2).map((ann) => (
+                <div
+                  key={ann.announcement_id}
+                  className={`p-4 rounded-lg ${ann.is_pinned ? "bg-yellow-500/10 border border-yellow-500/30" : "bg-muted/50"}`}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium">{announcement.title}</h4>
-                    <p className="text-xs text-muted-foreground">{formatDate(announcement.createdAt)}</p>
+                    <h4 className="font-medium">{ann.title}</h4>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(ann.published_at)}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{announcement.content}</p>
+                  <p className="text-sm text-muted-foreground">{ann.content}</p>
                 </div>
               ))}
             </div>
@@ -242,33 +376,37 @@ export default function TenantDashboard() {
       )}
 
       {/* Contract Info */}
-      {tenantContract && (
+      {contract && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">ข้อมูลสัญญาเช่า</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-sm text-muted-foreground">วันเริ่มสัญญา</p>
-                <p className="font-medium">{formatDate(tenantContract.startDate)}</p>
+                <p className="text-muted-foreground">วันเริ่มสัญญา</p>
+                <p className="font-medium">{formatDate(contract.start_date)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">วันสิ้นสุดสัญญา</p>
-                <p className="font-medium">{formatDate(tenantContract.endDate)}</p>
+                <p className="text-muted-foreground">วันสิ้นสุดสัญญา</p>
+                <p className="font-medium">{formatDate(contract.end_date)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
-                <p className="font-medium">{formatCurrency(tenantContract.monthlyRent)}</p>
+                <p className="text-muted-foreground">ค่าเช่ารายเดือน</p>
+                <p className="font-medium">
+                  {formatCurrency(Number(contract.rent_amount))}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">เงินประกัน</p>
-                <p className="font-medium">{formatCurrency(tenantContract.deposit)}</p>
+                <p className="text-muted-foreground">เงินประกัน</p>
+                <p className="font-medium">
+                  {formatCurrency(Number(contract.deposit_amount))}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
     </div>
-  )
+  );
 }

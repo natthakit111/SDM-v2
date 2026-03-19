@@ -1,92 +1,109 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Download, FileText, Eye } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FileText, Loader2, Download } from "lucide-react";
+import { contractAPI } from "@/lib/api/contract.api";
+import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 interface Contract {
-  id: string
-  tenantName: string
-  room: string
-  startDate: string
-  endDate: string
-  duration: number
-  deposit: number
-  rentAmount: number
-  status: 'pending' | 'active' | 'expired'
-  signedDate?: string
+  contract_id: number;
+  room_number: string;
+  tenant_name: string;
+  start_date: string;
+  end_date: string;
+  rent_amount: number;
+  deposit_amount: number;
+  status: "active" | "expired" | "terminated";
+  note: string | null;
 }
 
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+const fmtCurrency = (n: number) => Number(n).toLocaleString("th-TH") + " บาท";
+
+const statusConfig: Record<string, { label: string; color: string }> = {
+  active: { label: "ใช้งานอยู่", color: "bg-green-500/20 text-green-500" },
+  expired: { label: "หมดอายุ", color: "bg-red-500/10 text-red-500" },
+  terminated: { label: "ยกเลิกแล้ว", color: "bg-muted text-muted-foreground" },
+};
+
 export default function TenantContractPage() {
-  const [contracts] = useState<Contract[]>([
-    {
-      id: 'CNT001',
-      tenantName: 'สมชาย สมการ',
-      room: 'A101',
-      startDate: '2024-01-01',
-      endDate: '2025-12-31',
-      duration: 24,
-      deposit: 5000,
-      rentAmount: 5000,
-      status: 'active',
-      signedDate: '2023-12-20'
-    },
-  ])
+  const { t } = useLanguage();
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
+  useEffect(() => {
+    contractAPI
+      .getMyContract()
+      .then((r) => setContract(r.data ?? null))
+      .catch(() => {
+        /* ไม่มีสัญญาก็ไม่ error */
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
-  const handleDownload = (contract: Contract) => {
-    const element = document.createElement('a')
-    const file = new Blob(
-      [
-        `สัญญาเช่าห้องพัก\n\n` +
-        `รายละเอียดสัญญา:\n` +
-        `ชื่อผู้เช่า: ${contract.tenantName}\n` +
-        `ห้อง: ${contract.room}\n` +
-        `วันเริ่มต้น: ${contract.startDate}\n` +
-        `วันสิ้นสุด: ${contract.endDate}\n` +
-        `ระยะเวลา: ${contract.duration} เดือน\n` +
-        `ค่าเช่ารายเดือน: ${contract.rentAmount.toLocaleString('th-TH')} บาท\n` +
-        `เงินประกัน: ${contract.deposit.toLocaleString('th-TH')} บาท\n` +
-        `สถานะ: ${contract.status === 'active' ? 'ใช้งานอยู่' : contract.status === 'pending' ? 'รอการยืนยัน' : 'หมดอายุ'}`
-      ],
-      { type: 'text/plain' }
-    )
-    element.href = URL.createObjectURL(file)
-    element.download = `contract_${contract.id}.txt`
-    document.body.appendChild(element)
-    element.click()
-    document.body.removeChild(element)
-  }
+  const handleDownload = () => {
+    if (!contract) return;
+    const text = [
+      "สัญญาเช่าห้องพัก",
+      "",
+      `ชื่อผู้เช่า: ${contract.tenant_name}`,
+      `ห้อง: ${contract.room_number}`,
+      `วันเริ่มต้น: ${fmtDate(contract.start_date)}`,
+      `วันสิ้นสุด: ${fmtDate(contract.end_date)}`,
+      `ค่าเช่ารายเดือน: ${fmtCurrency(contract.rent_amount)}`,
+      `เงินประกัน: ${fmtCurrency(contract.deposit_amount)}`,
+      `สถานะ: ${statusConfig[contract.status]?.label ?? contract.status}`,
+      contract.note ? `หมายเหตุ: ${contract.note}` : "",
+    ].join("\n");
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-success/20 text-success'
-      case 'pending':
-        return 'bg-warning/20 text-warning-foreground'
-      case 'expired':
-        return 'bg-destructive/20 text-destructive'
-      default:
-        return 'bg-muted text-muted-foreground'
-    }
-  }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.download = `contract_CNT${String(contract.contract_id).padStart(3, "0")}.txt`;
+    a.click();
+  };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'ใช้งานอยู่'
-      case 'pending':
-        return 'รอการยืนยัน'
-      case 'expired':
-        return 'หมดอายุ'
-      default:
-        return status
-    }
-  }
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-24 gap-2 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" /> กำลังโหลด...
+      </div>
+    );
+
+  if (!contract)
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">สัญญาเช่า</h1>
+          <p className="text-muted-foreground mt-2">
+            ดูและจัดการสัญญาเช่าของคุณ
+          </p>
+        </div>
+        <Card>
+          <CardContent className="pt-10 text-center py-12">
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <p className="text-muted-foreground">ยังไม่มีสัญญาเช่า</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+
+  const s = statusConfig[contract.status] ?? statusConfig.expired;
 
   return (
     <div className="space-y-6">
@@ -95,182 +112,67 @@ export default function TenantContractPage() {
         <p className="text-muted-foreground mt-2">ดูและจัดการสัญญาเช่าของคุณ</p>
       </div>
 
-      {/* Current Contract */}
-      {contracts.length > 0 && (
-        <Card className="border-primary/50 bg-primary/5">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>สัญญาปัจจุบัน</CardTitle>
-                <CardDescription>สัญญาที่กำลังใช้งาน</CardDescription>
-              </div>
-              <Badge className={`${getStatusColor(contracts[0].status)}`}>
-                {getStatusLabel(contracts[0].status)}
-              </Badge>
+      <Card className="border-primary/50 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>สัญญาปัจจุบัน</CardTitle>
+              <CardDescription>
+                CNT{String(contract.contract_id).padStart(3, "0")}
+              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">ห้อง</p>
-                <p className="text-lg font-bold">{contracts[0].room}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">ระยะเวลา</p>
-                <p className="text-lg font-bold">{contracts[0].duration} เดือน</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">วันเริ่มต้น</p>
-                <p className="text-lg font-bold">
-                  {new Date(contracts[0].startDate).toLocaleDateString('th-TH')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">วันสิ้นสุด</p>
-                <p className="text-lg font-bold">
-                  {new Date(contracts[0].endDate).toLocaleDateString('th-TH')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
-                <p className="text-lg font-bold text-info">
-                  {contracts[0].rentAmount.toLocaleString('th-TH')} บาท
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">เงินประกัน</p>
-                <p className="text-lg font-bold text-warning-foreground">
-                  {contracts[0].deposit.toLocaleString('th-TH')} บาท
-                </p>
-              </div>
+            <span
+              className={`text-xs font-medium px-3 py-1 rounded-full ${s.color}`}
+            >
+              {s.label}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-muted-foreground">ห้อง</p>
+              <p className="text-2xl font-bold">{contract.room_number}</p>
             </div>
-
-            {contracts[0].signedDate && (
-              <div className="pt-4 border-t">
-                <p className="text-xs text-muted-foreground">
-                  ลงนามวันที่: {new Date(contracts[0].signedDate).toLocaleDateString('th-TH')}
-                </p>
+            <div>
+              <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
+              <p className="text-2xl font-bold text-primary">
+                {fmtCurrency(contract.rent_amount)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">วันเริ่มต้น</p>
+              <p className="text-lg font-semibold">
+                {fmtDate(contract.start_date)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">วันสิ้นสุด</p>
+              <p className="text-lg font-semibold">
+                {fmtDate(contract.end_date)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">เงินประกัน</p>
+              <p className="text-lg font-semibold text-yellow-600">
+                {fmtCurrency(contract.deposit_amount)}
+              </p>
+            </div>
+            {contract.note && (
+              <div>
+                <p className="text-sm text-muted-foreground">หมายเหตุ</p>
+                <p className="text-sm">{contract.note}</p>
               </div>
             )}
+          </div>
 
-            <div className="flex gap-2 pt-4">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="gap-2" onClick={() => setSelectedContract(contracts[0])}>
-                    <Eye className="h-4 w-4" />
-                    ดู
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>สัญญาเช่า</DialogTitle>
-                    <DialogDescription>รายละเอียดสัญญาเช่า</DialogDescription>
-                  </DialogHeader>
-                  {selectedContract && (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      <div className="prose prose-sm dark:prose-invert">
-                        <h3>สัญญาเช่าห้องพัก</h3>
-                        <p>
-                          ผู้ให้เช่า (บ้านเช่า DormFlow) ได้ตกลงให้เช่าห้องพักกับผู้เช่า (${selectedContract.tenantName}) 
-                          โดยมีรายละเอียดดังต่อไปนี้
-                        </p>
-                        <h4>1. รายละเอียดห้องพัก</h4>
-                        <p>
-                          ห้องที่ ${selectedContract.room} ตั้งอยู่ในหอพัก ระยะเวลาการเช่า ${selectedContract.duration} เดือน
-                        </p>
-                        <h4>2. ข้อตกลงการชำระเงิน</h4>
-                        <p>
-                          ค่าเช่ารายเดือน: ${selectedContract.rentAmount.toLocaleString('th-TH')} บาท<br/>
-                          เงินประกัน: ${selectedContract.deposit.toLocaleString('th-TH')} บาท
-                        </p>
-                        <h4>3. ระยะเวลาการเช่า</h4>
-                        <p>
-                          ตั้งแต่วันที่ ${new Date(selectedContract.startDate).toLocaleDateString('th-TH')} 
-                          ถึงวันที่ ${new Date(selectedContract.endDate).toLocaleDateString('th-TH')}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-
-              <Button className="gap-2" onClick={() => handleDownload(contracts[0])}>
-                <Download className="h-4 w-4" />
-                ดาวน์โหลด
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Contract History */}
-      {contracts.length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>ประวัติสัญญา</CardTitle>
-            <CardDescription>สัญญาทั้งหมด</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {contracts.map(contract => (
-                <div key={contract.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-start gap-4 flex-1">
-                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium">ห้อง {contract.room}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(contract.startDate).toLocaleDateString('th-TH')} - {new Date(contract.endDate).toLocaleDateString('th-TH')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge className={`${getStatusColor(contract.status)}`}>
-                      {getStatusLabel(contract.status)}
-                    </Badge>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedContract(contract)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>สัญญาเช่า</DialogTitle>
-                        </DialogHeader>
-                        {selectedContract && (
-                          <div className="space-y-4 max-h-96 overflow-y-auto">
-                            <p>ห้อง: {selectedContract.room}</p>
-                            <p>ค่าเช่า: {selectedContract.rentAmount.toLocaleString('th-TH')} บาท</p>
-                            <p>เงินประกัน: {selectedContract.deposit.toLocaleString('th-TH')} บาท</p>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleDownload(contract)}
-                      title="ดาวน์โหลด"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Empty State */}
-      {contracts.length === 0 && (
-        <Card>
-          <CardContent className="pt-10 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">ไม่มีสัญญาเช่า</p>
-          </CardContent>
-        </Card>
-      )}
+          <div className="pt-4 border-t">
+            <Button onClick={handleDownload} className="gap-2">
+              <Download className="h-4 w-4" /> ดาวน์โหลดสัญญา
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }

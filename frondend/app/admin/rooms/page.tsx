@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLanguage } from "@/context/language-context";
 import {
   Card,
   CardContent,
@@ -40,8 +41,6 @@ import { Plus, Search, Pencil, Trash2, DoorOpen, Loader2 } from "lucide-react";
 import { roomAPI } from "@/lib/api/room.api";
 import { toast } from "sonner";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface Room {
   room_id: number;
   room_number: string;
@@ -80,9 +79,8 @@ const formatCurrency = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 
-// ── Component ──────────────────────────────────────────────────────────────────
-
 export default function RoomsPage() {
+  const { t } = useLanguage();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -92,7 +90,6 @@ export default function RoomsPage() {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchRooms = useCallback(async () => {
     try {
       setLoading(true);
@@ -100,8 +97,8 @@ export default function RoomsPage() {
         statusFilter !== "all" ? { status: statusFilter } : undefined,
       );
       setRooms(res.data ?? []);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลห้องไม่สำเร็จ");
+    } catch {
+      toast.error(t("common.noData"));
     } finally {
       setLoading(false);
     }
@@ -111,12 +108,10 @@ export default function RoomsPage() {
     fetchRooms();
   }, [fetchRooms]);
 
-  // ── Filter search client-side ──────────────────────────────────────────────
   const filteredRooms = rooms.filter((r) =>
     r.room_number.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -130,26 +125,22 @@ export default function RoomsPage() {
         status: formData.status,
         description: formData.description || undefined,
       };
-
       if (editingRoom) {
         await roomAPI.update(editingRoom.room_id, payload);
-        toast.success("อัปเดตข้อมูลห้องเรียบร้อย");
+        toast.success(t("common.save"));
       } else {
         await roomAPI.create(payload);
-        toast.success("เพิ่มห้องใหม่เรียบร้อย");
+        toast.success(t("rooms.add"));
       }
       resetForm();
       fetchRooms();
     } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่",
-      );
+      toast.error(err?.response?.data?.message ?? "Error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Edit ───────────────────────────────────────────────────────────────────
   const handleEdit = (room: Room) => {
     setEditingRoom(room);
     setFormData({
@@ -164,19 +155,18 @@ export default function RoomsPage() {
     setIsAddDialogOpen(true);
   };
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
   const handleDelete = async (room: Room) => {
     if (room.status === "occupied") {
-      toast.error("ไม่สามารถลบห้องที่มีผู้เช่าอยู่ได้");
+      toast.error("ไม่สามารถลบห้องที่มีผู้เช่า");
       return;
     }
-    if (!confirm(`ต้องการลบห้อง ${room.room_number} หรือไม่?`)) return;
+    if (!confirm(`${t("common.delete")} ${room.room_number}?`)) return;
     try {
       await roomAPI.delete(room.room_id);
-      toast.success("ลบห้องเรียบร้อย");
+      toast.success(t("common.delete"));
       fetchRooms();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "ลบไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? "Error");
     }
   };
 
@@ -185,22 +175,17 @@ export default function RoomsPage() {
     setEditingRoom(null);
     setIsAddDialogOpen(false);
   };
-
   const set =
-    (field: keyof FormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setFormData((p) => ({ ...p, [field]: e.target.value }));
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">จัดการห้องพัก</h1>
-          <p className="text-muted-foreground">จัดการห้องพักทั้งหมดในระบบ</p>
+          <h1 className="text-2xl font-bold">{t("rooms.title")}</h1>
+          <p className="text-muted-foreground">{t("rooms.subtitle")}</p>
         </div>
-
         <Dialog
           open={isAddDialogOpen}
           onOpenChange={(open) => {
@@ -211,37 +196,32 @@ export default function RoomsPage() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              เพิ่มห้อง
+              {t("rooms.add")}
             </Button>
           </DialogTrigger>
-
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
-                {editingRoom ? "แก้ไขห้อง" : "เพิ่มห้องใหม่"}
+                {editingRoom ? t("common.edit") : t("rooms.add")}
               </DialogTitle>
               <DialogDescription>
-                {editingRoom
-                  ? "แก้ไขข้อมูลห้องพัก"
-                  : "กรอกข้อมูลเพื่อเพิ่มห้องใหม่"}
+                {editingRoom ? t("common.edit") : t("rooms.add")}
               </DialogDescription>
             </DialogHeader>
-
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="room_number">หมายเลขห้อง</FieldLabel>
+                    <FieldLabel>{t("rooms.roomNumber")}</FieldLabel>
                     <Input
-                      id="room_number"
                       value={formData.room_number}
                       onChange={set("room_number")}
-                      placeholder="เช่น 101"
+                      placeholder="101"
                       required
                     />
                   </Field>
                   <Field>
-                    <FieldLabel>ชั้น</FieldLabel>
+                    <FieldLabel>{t("rooms.floor")}</FieldLabel>
                     <Select
                       value={formData.floor}
                       onValueChange={(v) =>
@@ -254,17 +234,16 @@ export default function RoomsPage() {
                       <SelectContent>
                         {[1, 2, 3, 4, 5].map((f) => (
                           <SelectItem key={f} value={f.toString()}>
-                            ชั้น {f}
+                            {t("rooms.floor")} {f}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel>ประเภทห้อง</FieldLabel>
+                    <FieldLabel>{t("rooms.type")}</FieldLabel>
                     <Select
                       value={formData.room_type}
                       onValueChange={(v) =>
@@ -275,14 +254,20 @@ export default function RoomsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="standard">ห้องมาตรฐาน</SelectItem>
-                        <SelectItem value="deluxe">ห้องดีลักซ์</SelectItem>
-                        <SelectItem value="suite">ห้องสวีท</SelectItem>
+                        <SelectItem value="standard">
+                          {t("rooms.standard")}
+                        </SelectItem>
+                        <SelectItem value="deluxe">
+                          {t("rooms.deluxe")}
+                        </SelectItem>
+                        <SelectItem value="suite">
+                          {t("rooms.suite")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel>สถานะ</FieldLabel>
+                    <FieldLabel>{t("common.status")}</FieldLabel>
                     <Select
                       value={formData.status}
                       onValueChange={(v) =>
@@ -296,21 +281,23 @@ export default function RoomsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="available">ว่าง</SelectItem>
-                        <SelectItem value="occupied">มีผู้เช่า</SelectItem>
-                        <SelectItem value="maintenance">ซ่อมบำรุง</SelectItem>
+                        <SelectItem value="available">
+                          {t("status.available")}
+                        </SelectItem>
+                        <SelectItem value="occupied">
+                          {t("status.occupied")}
+                        </SelectItem>
+                        <SelectItem value="maintenance">
+                          {t("status.maintenance")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="base_rent">
-                      ค่าเช่า/เดือน (บาท)
-                    </FieldLabel>
+                    <FieldLabel>{t("rooms.rent")}</FieldLabel>
                     <Input
-                      id="base_rent"
                       type="number"
                       value={formData.base_rent}
                       onChange={set("base_rent")}
@@ -319,9 +306,8 @@ export default function RoomsPage() {
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="area_sqm">พื้นที่ (ตร.ม.)</FieldLabel>
+                    <FieldLabel>{t("rooms.area")}</FieldLabel>
                     <Input
-                      id="area_sqm"
                       type="number"
                       value={formData.area_sqm}
                       onChange={set("area_sqm")}
@@ -329,18 +315,14 @@ export default function RoomsPage() {
                     />
                   </Field>
                 </div>
-
                 <Field>
-                  <FieldLabel htmlFor="description">หมายเหตุ</FieldLabel>
+                  <FieldLabel>{t("common.note")}</FieldLabel>
                   <Input
-                    id="description"
                     value={formData.description}
                     onChange={set("description")}
-                    placeholder="รายละเอียดเพิ่มเติม"
                   />
                 </Field>
               </FieldGroup>
-
               <DialogFooter className="mt-6">
                 <Button
                   type="button"
@@ -348,13 +330,13 @@ export default function RoomsPage() {
                   onClick={resetForm}
                   disabled={submitting}
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </Button>
                 <Button type="submit" disabled={submitting}>
                   {submitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {editingRoom ? "บันทึก" : "เพิ่มห้อง"}
+                  {t("common.save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -362,14 +344,13 @@ export default function RoomsPage() {
         </Dialog>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาหมายเลขห้อง..."
+                placeholder={t("rooms.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -377,45 +358,52 @@ export default function RoomsPage() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="สถานะทั้งหมด" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-                <SelectItem value="available">ว่าง</SelectItem>
-                <SelectItem value="occupied">มีผู้เช่า</SelectItem>
-                <SelectItem value="maintenance">ซ่อมบำรุง</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="available">
+                  {t("status.available")}
+                </SelectItem>
+                <SelectItem value="occupied">{t("status.occupied")}</SelectItem>
+                <SelectItem value="maintenance">
+                  {t("status.maintenance")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DoorOpen className="h-5 w-5" />
-            รายการห้องพัก
+            {t("rooms.list")}
           </CardTitle>
-          <CardDescription>ทั้งหมด {filteredRooms.length} ห้อง</CardDescription>
+          <CardDescription>
+            {filteredRooms.length} {t("rooms.title")}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              กำลังโหลด...
+              {t("common.loading")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ห้อง</TableHead>
-                  <TableHead>ชั้น</TableHead>
-                  <TableHead>ประเภท</TableHead>
-                  <TableHead>พื้นที่</TableHead>
-                  <TableHead>ค่าเช่า</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead>{t("rooms.roomNumber")}</TableHead>
+                  <TableHead>{t("rooms.floor")}</TableHead>
+                  <TableHead>{t("rooms.type")}</TableHead>
+                  <TableHead>{t("rooms.area")}</TableHead>
+                  <TableHead>{t("rooms.rent")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -460,7 +448,7 @@ export default function RoomsPage() {
                       colSpan={7}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      ไม่พบห้องพักที่ตรงกับการค้นหา
+                      {t("common.noData")}
                     </TableCell>
                   </TableRow>
                 )}

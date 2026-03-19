@@ -18,6 +18,10 @@ const telegramRoutes     = require('./telegram.routes')
 const reportRoutes       = require('./report.routes')
 const settingsRoutes     = require('./settings.routes')
 
+// backend/src/routes/index.js — เพิ่มบรรทัดนี้
+const moveOutRoutes = require('./moveOut.routes');
+router.use('/move-out', moveOutRoutes);
+
 router.use('/auth',          authRoutes)
 router.use('/rooms',         roomRoutes)
 router.use('/tenants',       tenantRoutes)

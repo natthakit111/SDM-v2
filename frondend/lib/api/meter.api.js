@@ -14,12 +14,11 @@ export const meterAPI = {
   getById: (id) =>
     api.get(`/meters/${id}`).then((r) => r.data),
 
-  // ⚠️ multipart/form-data
+  // ⚠️ field ชื่อ `meter_image` (ต้องตรงกับ multer ใน backend)
   create: (data, imageFile) => {
     const form = new FormData();
-    // data: { room_id, meter_type:'electric'|'water', reading_month, reading_year, current_unit, rate_per_unit? }
     Object.entries(data).forEach(([k, v]) => form.append(k, v));
-    if (imageFile) form.append('image', imageFile);
+    if (imageFile) form.append('meter_image', imageFile); // ✅ แก้จาก 'image'
     return api.post('/meters', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);
@@ -28,7 +27,7 @@ export const meterAPI = {
   update: (id, data, imageFile) => {
     const form = new FormData();
     Object.entries(data).forEach(([k, v]) => form.append(k, v));
-    if (imageFile) form.append('image', imageFile);
+    if (imageFile) form.append('meter_image', imageFile); // ✅ แก้จาก 'image'
     return api.put(`/meters/${id}`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);

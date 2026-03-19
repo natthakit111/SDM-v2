@@ -1,10 +1,6 @@
 /**
  * frondend/lib/api/payment.api.js
  * Backend: /api/payments
- *
- * ⚠️ submit payment ใช้ POST /payments (multipart)
- *    verify = PUT /:id/verify
- *    reject = PUT /:id/reject  (endpoint แยกกัน)
  */
 import api from './axiosInstance';
 
@@ -13,13 +9,12 @@ export const paymentAPI = {
   getMyPayments: (params) =>
     api.get('/payments/my', { params }).then((r) => r.data),
 
-  // ⚠️ multipart/form-data
+  // ⚠️ field ชื่อ `payment_slip` (ต้องตรงกับ multer ใน backend)
   submit: (billId, slipFile, paymentMethod = 'qr_promptpay') => {
     const form = new FormData();
     form.append('bill_id', billId);
     form.append('payment_method', paymentMethod);
-    // payment_method: 'qr_promptpay' | 'cash' | 'bank_transfer'
-    if (slipFile) form.append('slip', slipFile);
+    if (slipFile) form.append('payment_slip', slipFile); // ✅ แก้จาก 'slip' → 'payment_slip'
     return api.post('/payments', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);
@@ -32,7 +27,6 @@ export const paymentAPI = {
   getById: (id) =>
     api.get(`/payments/${id}`).then((r) => r.data),
 
-  // ⚠️ verify และ reject เป็น endpoint แยกกัน
   verify: (id) =>
     api.put(`/payments/${id}/verify`).then((r) => r.data),
 

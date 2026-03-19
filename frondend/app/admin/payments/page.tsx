@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,7 @@ interface Payment {
   remark: string | null;
   verified_by_name: string | null;
   verified_at: string | null;
+  paid_at: string | null;
   created_at: string;
 }
 
@@ -59,6 +61,8 @@ const formatDate = (dateStr: string | null) => {
     year: "numeric",
     month: "short",
     day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -75,6 +79,9 @@ export default function PaymentsPage() {
   const [filterMethod, setFilterMethod] = useState<string>("all");
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
 
   const fetchPayments = useCallback(async () => {
     try {
@@ -94,6 +101,43 @@ export default function PaymentsPage() {
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  const handleVerify = async () => {
+    if (!selectedPayment) return;
+    try {
+      setActionLoading(true);
+      await paymentAPI.verify(selectedPayment.payment_id);
+      toast.success("อนุมัติการชำระเงินเรียบร้อย");
+      setDetailsDialogOpen(false);
+      setSelectedPayment(null);
+      fetchPayments();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!selectedPayment || !rejectReason.trim()) {
+      toast.error("กรุณาระบุเหตุผล");
+      return;
+    }
+    try {
+      setActionLoading(true);
+      await paymentAPI.reject(selectedPayment.payment_id, rejectReason);
+      toast.success("ปฏิเสธการชำระเงินแล้ว");
+      setRejectDialogOpen(false);
+      setDetailsDialogOpen(false);
+      setRejectReason("");
+      setSelectedPayment(null);
+      fetchPayments();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const filteredPayments = payments.filter((p) => {
     const q = searchTerm.toLowerCase();
@@ -130,6 +174,8 @@ export default function PaymentsPage() {
     return `${process.env.NEXT_PUBLIC_API_URL ?? ""}/${path}`;
   };
 
+  const paidDate = (p: Payment) => p.paid_at ?? p.created_at;
+
   return (
     <div className="space-y-6">
       <div>
@@ -139,57 +185,34 @@ export default function PaymentsPage() {
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              รวมทั้งหมด
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              รอการตรวจสอบ
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">
-              {stats.pending}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              ตรวจสอบแล้ว
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {stats.verified}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              ปฏิเสธ
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              {stats.rejected}
-            </div>
-          </CardContent>
-        </Card>
+        {[
+          { label: "รวมทั้งหมด", value: stats.total, color: "" },
+          {
+            label: "รอการตรวจสอบ",
+            value: stats.pending,
+            color: "text-warning",
+          },
+          {
+            label: "ตรวจสอบแล้ว",
+            value: stats.verified,
+            color: "text-success",
+          },
+          { label: "ปฏิเสธ", value: stats.rejected, color: "text-destructive" },
+        ].map((s) => (
+          <Card key={s.label}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {s.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -226,7 +249,6 @@ export default function PaymentsPage() {
         </CardContent>
       </Card>
 
-      {/* List */}
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -259,7 +281,7 @@ export default function PaymentsPage() {
                               {getMethodLabel(payment.payment_method)}
                             </span>
                             <span className="text-xs bg-muted px-2 py-1 rounded">
-                              {formatDate(payment.created_at)}
+                              {formatDate(paidDate(payment))}
                             </span>
                           </div>
                           {payment.remark && (
@@ -272,25 +294,22 @@ export default function PaymentsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => {
-                        setSelectedPayment(payment);
-                        setDetailsDialogOpen(true);
-                      }}
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span className="hidden sm:inline">ดู</span>
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 flex-shrink-0"
+                    onClick={() => {
+                      setSelectedPayment(payment);
+                      setDetailsDialogOpen(true);
+                    }}
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span className="hidden sm:inline">ดู</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
-
           {filteredPayments.length === 0 && (
             <Card>
               <CardContent className="pt-6 text-center py-12">
@@ -348,7 +367,7 @@ export default function PaymentsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">วันที่ชำระ</p>
                   <p className="font-medium">
-                    {formatDate(selectedPayment.created_at)}
+                    {formatDate(paidDate(selectedPayment))}
                   </p>
                 </div>
                 <div>
@@ -419,8 +438,85 @@ export default function PaymentsPage() {
                   </div>
                 )}
               </div>
+
+              {/* ✅ ปุ่ม อนุมัติ/ปฏิเสธ */}
+              {selectedPayment.status === "pending_verify" && (
+                <div className="flex gap-3 pt-2 border-t">
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    disabled={actionLoading}
+                    onClick={() => {
+                      setDetailsDialogOpen(false);
+                      setRejectDialogOpen(true);
+                    }}
+                  >
+                    <XCircle className="mr-2 w-4 h-4" />
+                    ปฏิเสธ
+                  </Button>
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    disabled={actionLoading}
+                    onClick={handleVerify}
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="mr-2 w-4 h-4" />
+                    )}
+                    อนุมัติ
+                  </Button>
+                </div>
+              )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Dialog */}
+      <Dialog
+        open={rejectDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRejectDialogOpen(false);
+            setRejectReason("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ปฏิเสธการชำระเงิน</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium">ผู้เช่า</p>
+              <p>
+                {selectedPayment?.tenant_name} — ห้อง{" "}
+                {selectedPayment?.room_number}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-2">เหตุผล</label>
+              <Textarea
+                placeholder="เช่น จำนวนเงินไม่ตรง, สลิปไม่ชัดเจน ฯลฯ"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={handleRejectSubmit}
+              disabled={!rejectReason.trim() || actionLoading}
+              variant="destructive"
+              className="w-full"
+            >
+              {actionLoading ? (
+                <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 w-4 h-4" />
+              )}
+              ยืนยันการปฏิเสธ
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
