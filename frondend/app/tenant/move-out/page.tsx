@@ -33,6 +33,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { moveOutAPI } from "@/lib/api/moveOut.api";
+import { useLanguage } from "@/context/language-context";
 import { toast } from "sonner";
 
 interface MoveOutRequest {
@@ -45,35 +46,44 @@ interface MoveOutRequest {
   room_number: string;
 }
 
-const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
-const statusConfig = {
-  pending: { label: "รอพิจารณา", icon: Clock, color: "text-yellow-500" },
-  approved: {
-    label: "อนุมัติแล้ว",
-    icon: CheckCircle,
-    color: "text-green-500",
-  },
-  rejected: { label: "ไม่อนุมัติ", icon: XCircle, color: "text-destructive" },
-};
-
 export default function MoveOutPage() {
+  const { t, language } = useLanguage();
   const [requests, setRequests] = useState<MoveOutRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ moveOutDate: "", reason: "" });
 
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+  const statusConfig = {
+    pending: {
+      label: t("status.pending"),
+      icon: Clock,
+      color: "text-yellow-500",
+    },
+    approved: {
+      label: t("status.approved"),
+      icon: CheckCircle,
+      color: "text-green-500",
+    },
+    rejected: {
+      label: t("status.rejected"),
+      icon: XCircle,
+      color: "text-destructive",
+    },
+  };
+
   const fetchRequests = () => {
     moveOutAPI
       .getAll()
       .then((r) => setRequests(r.data ?? []))
-      .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ"))
+      .catch(() => toast.error(t("moveout.loadError")))
       .finally(() => setLoading(false));
   };
 
@@ -86,7 +96,7 @@ export default function MoveOutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.moveOutDate || !formData.reason) {
-      toast.error("กรุณากรอกข้อมูลให้ครบถ้วน");
+      toast.error(t("settings.errorFillAll"));
       return;
     }
     const daysNotice = Math.ceil(
@@ -94,22 +104,21 @@ export default function MoveOutPage() {
         (1000 * 60 * 60 * 24),
     );
     if (daysNotice < 30) {
-      toast.error("กรุณาแจ้งล่วงหน้าอย่างน้อย 30 วัน");
+      toast.error(t("moveout.notice30"));
       return;
     }
-
     setSubmitting(true);
     try {
       await moveOutAPI.create({
         move_out_date: formData.moveOutDate,
         reason: formData.reason,
       });
-      toast.success("ส่งคำร้องขอย้ายออกเรียบร้อย รอแอดมินอนุมัติ");
+      toast.success(t("common.confirm"));
       setFormData({ moveOutDate: "", reason: "" });
       setIsDialogOpen(false);
       fetchRequests();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "ส่งคำร้องไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("moveout.rejectError"));
     } finally {
       setSubmitting(false);
     }
@@ -120,9 +129,9 @@ export default function MoveOutPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">ขอย้ายออก</h1>
+          <h1 className="text-2xl font-bold">{t("tenant.moveout.title")}</h1>
           <p className="text-muted-foreground">
-            แจ้งความประสงค์ย้ายออกจากหอพัก
+            {t("tenant.moveout.subtitle")}
           </p>
         </div>
 
@@ -130,36 +139,33 @@ export default function MoveOutPage() {
           <DialogTrigger asChild>
             <Button className="gap-2" disabled={hasPending}>
               <Plus className="h-4 w-4" />
-              {hasPending ? "มีคำร้องรออยู่แล้ว" : "ส่งคำร้องขอย้ายออก"}
+              {hasPending
+                ? t("tenant.moveout.hasPending")
+                : t("moveout.request")}
             </Button>
           </DialogTrigger>
-
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <LogOut className="h-5 w-5" />
-                ส่งคำร้องขอย้ายออก
+                {t("moveout.request")}
               </DialogTitle>
-              <DialogDescription>
-                กรุณาแจ้งล่วงหน้าอย่างน้อย 30 วัน — แอดมินจะตรวจสอบและอนุมัติ
-              </DialogDescription>
+              <DialogDescription>{t("moveout.notice30")}</DialogDescription>
             </DialogHeader>
-
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex gap-3">
                   <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium">ต้องแจ้งล่วงหน้า 30 วัน</p>
+                    <p className="font-medium">{t("moveout.notice30")}</p>
                     <p className="text-xs text-muted-foreground">
-                      การแจ้งล่าช้าอาจมีค่าปรับ 1 เดือน
+                      {t("moveout.fine")}
                     </p>
                   </div>
                 </div>
-
                 <Field>
                   <FieldLabel htmlFor="moveOutDate">
-                    วันที่ต้องการย้ายออก
+                    {t("moveout.moveOutDate")}
                   </FieldLabel>
                   <Input
                     id="moveOutDate"
@@ -179,12 +185,13 @@ export default function MoveOutPage() {
                     required
                   />
                 </Field>
-
                 <Field>
-                  <FieldLabel htmlFor="reason">เหตุผลในการย้ายออก</FieldLabel>
+                  <FieldLabel htmlFor="reason">
+                    {t("moveout.reason")}
+                  </FieldLabel>
                   <Textarea
                     id="reason"
-                    placeholder="เช่น ย้ายกลับบ้านเกิด, เปลี่ยนที่ทำงาน"
+                    placeholder={t("moveout.reason")}
                     value={formData.reason}
                     onChange={(e) =>
                       setFormData((p) => ({ ...p, reason: e.target.value }))
@@ -194,7 +201,6 @@ export default function MoveOutPage() {
                   />
                 </Field>
               </FieldGroup>
-
               <DialogFooter className="mt-6">
                 <Button
                   type="button"
@@ -202,13 +208,13 @@ export default function MoveOutPage() {
                   onClick={() => setIsDialogOpen(false)}
                   disabled={submitting}
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </Button>
                 <Button type="submit" disabled={submitting}>
                   {submitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  ส่งคำร้อง
+                  {t("common.submit")}
                 </Button>
               </DialogFooter>
             </form>
@@ -220,17 +226,17 @@ export default function MoveOutPage() {
       <div className="grid grid-cols-3 gap-4">
         {[
           {
-            label: "รอพิจารณา",
+            label: t("status.pending"),
             value: requests.filter((r) => r.status === "pending").length,
             color: "text-yellow-500",
           },
           {
-            label: "อนุมัติแล้ว",
+            label: t("status.approved"),
             value: requests.filter((r) => r.status === "approved").length,
             color: "text-green-500",
           },
           {
-            label: "ไม่อนุมัติ",
+            label: t("status.rejected"),
             value: requests.filter((r) => r.status === "rejected").length,
             color: "text-destructive",
           },
@@ -253,23 +259,35 @@ export default function MoveOutPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LogOut className="h-5 w-5" />
-            รายการคำร้องขอย้ายออก
+            {t("moveout.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+              <Loader2 className="h-5 w-5 animate-spin" />
+              {t("common.loading")}
+            </div>
+          ) : requests.length === 0 ? (
+            // ✅ Empty state สำหรับ tenant ใหม่
+            <div className="text-center py-12">
+              <LogOut className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
+              <p className="font-medium text-muted-foreground">
+                {t("empty.noMoveOut")}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t("empty.noMoveOutDesc")}
+              </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>วันที่ส่งคำร้อง</TableHead>
-                  <TableHead>วันที่ต้องการย้ายออก</TableHead>
-                  <TableHead>เหตุผล</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead>หมายเหตุ</TableHead>
+                  <TableHead>{t("common.created")}</TableHead>
+                  <TableHead>{t("moveout.moveOutDate")}</TableHead>
+                  <TableHead>{t("moveout.reason")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead>{t("common.note")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -301,16 +319,6 @@ export default function MoveOutPage() {
                     </TableRow>
                   );
                 })}
-                {requests.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      ยังไม่มีคำร้องขอย้ายออก
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
           )}
@@ -322,25 +330,18 @@ export default function MoveOutPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-blue-500" />
-            ข้อมูลสำคัญ
+            {t("common.note")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            <span className="font-medium">ระยะเวลาแจ้ง:</span> อย่างน้อย 30
-            วันล่วงหน้า
+            <span className="font-medium">{t("moveout.notice30")}</span>
           </p>
           <p>
-            <span className="font-medium">ขั้นตอน:</span> ส่งคำร้อง →
-            แอดมินตรวจสอบ → อนุมัติ → ย้ายออก
+            <span className="font-medium">{t("moveout.fine")}</span>
           </p>
           <p>
-            <span className="font-medium">ค่าปรับ:</span> หากออกก่อนกำหนดเกิน 30
-            วัน จะถูกหักค่าปรับ 1 เดือน
-          </p>
-          <p>
-            <span className="font-medium">เงินประกัน:</span>{" "}
-            คืนหลังตรวจสอบสภาพห้องและหักค่าปรับ (ถ้ามี)
+            <span className="font-medium">{t("moveout.refund")}</span>
           </p>
         </CardContent>
       </Card>

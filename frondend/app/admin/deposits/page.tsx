@@ -1,3 +1,5 @@
+//deposits/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -23,6 +25,7 @@ import { PiggyBank, Check, Loader2 } from "lucide-react";
 import StatusBadge from "@/components/common/status-badge";
 import { contractAPI } from "@/lib/api/contract.api";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 // Contract จาก backend มี deposit_amount, status, tenant_name, room_number ฯลฯ
 interface Contract {
@@ -42,6 +45,7 @@ interface Contract {
 }
 
 export default function DepositsPage() {
+  const { t } = useLanguage();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -62,7 +66,7 @@ export default function DepositsPage() {
       const data: Contract[] = res?.data ?? res ?? [];
       setContracts(data.filter((c) => Number(c.deposit_amount) > 0));
     } catch {
-      toast.error("โหลดข้อมูลไม่สำเร็จ");
+      toast.error(t("deposits.loadError"));
     } finally {
       setLoading(false);
     }
@@ -113,14 +117,14 @@ export default function DepositsPage() {
       // contractAPI.terminate ใน contract.api.js ไม่รับ body
       // ต้องใช้ contractAPI.update หรือเรียก terminate แล้วส่ง note ผ่าน update
       await contractAPI.terminate(selectedContract.contract_id);
-      toast.success("บันทึกการคืนมัดจำเรียบร้อย");
+      toast.success(t("deposits.refundSuccess"));
       setRefundDialogOpen(false);
       setRefundNotes("");
       setRefundAmount("");
       setSelectedContract(null);
       fetchContracts();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
+      toast.error(err?.response?.data?.message ?? t("deposits.refundError"));
     } finally {
       setActionLoading(false);
     }
@@ -135,10 +139,8 @@ export default function DepositsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">เงินประกัน</h1>
-          <p className="text-muted-foreground mt-2">
-            จัดการเงินประกันและการคืนเงิน
-          </p>
+          <h1 className="text-3xl font-bold">{t("deposits.title")}</h1>
+          <p className="text-muted-foreground mt-2">{t("deposits.subtitle")}</p>
         </div>
       </div>
 
@@ -147,7 +149,7 @@ export default function DepositsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              รวมทั้งหมด
+              {t("deposits.statsTotal")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -158,14 +160,14 @@ export default function DepositsPage() {
                 stats.totalDeducted +
                 stats.totalRefunded
               ).toLocaleString("th-TH")}{" "}
-              บาท
+              {t("contracts.baht")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              เก็บไว้
+              {t("deposits.statusHeld")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -173,14 +175,14 @@ export default function DepositsPage() {
               {contracts.filter((c) => getDepositStatus(c) === "held").length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.totalHeld.toLocaleString("th-TH")} บาท
+              {stats.totalHeld.toLocaleString("th-TH")} {t("contracts.baht")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              คืนเงินแล้ว
+              {t("deposits.statusRefunded")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -191,14 +193,15 @@ export default function DepositsPage() {
               }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.totalRefunded.toLocaleString("th-TH")} บาท
+              {stats.totalRefunded.toLocaleString("th-TH")}{" "}
+              {t("contracts.baht")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              หักเงิน
+              {t("deposits.statusDeducted")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -209,7 +212,8 @@ export default function DepositsPage() {
               }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.totalDeducted.toLocaleString("th-TH")} บาท
+              {stats.totalDeducted.toLocaleString("th-TH")}{" "}
+              {t("contracts.baht")}
             </p>
           </CardContent>
         </Card>
@@ -221,7 +225,7 @@ export default function DepositsPage() {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
-                placeholder="ค้นหา ชื่อ ห้อง หรือ ID..."
+                placeholder={t("deposits.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -231,10 +235,14 @@ export default function DepositsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                <SelectItem value="held">เก็บไว้</SelectItem>
-                <SelectItem value="refunded">คืนเงินแล้ว</SelectItem>
-                <SelectItem value="deducted">หักเงิน</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="held">{t("deposits.statusHeld")}</SelectItem>
+                <SelectItem value="refunded">
+                  {t("deposits.statusRefunded")}
+                </SelectItem>
+                <SelectItem value="deducted">
+                  {t("deposits.statusDeducted")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -265,7 +273,7 @@ export default function DepositsPage() {
                               {contract.tenant_name}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              ห้อง {contract.room_number} • #
+                              {t("contracts.room")} {contract.room_number} • #
                               {contract.contract_id}
                             </p>
                             {contract.deposit_remark && (
@@ -275,11 +283,12 @@ export default function DepositsPage() {
                             )}
                             <div className="flex gap-2 mt-3 flex-wrap">
                               <span className="text-xs bg-muted px-2 py-1 rounded">
-                                ฝากเมื่อ {formatDate(contract.start_date)}
+                                {t("deposits.depositedOn")}{" "}
+                                {formatDate(contract.start_date)}
                               </span>
                               {contract.deposit_returned_at && (
                                 <span className="text-xs bg-muted px-2 py-1 rounded">
-                                  คืนเมื่อ{" "}
+                                  {t("deposits.returnedOn")}{" "}
                                   {formatDate(contract.deposit_returned_at)}
                                 </span>
                               )}
@@ -296,7 +305,9 @@ export default function DepositsPage() {
                             "th-TH",
                           )}
                         </p>
-                        <p className="text-xs text-muted-foreground">บาท</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("contracts.baht")}
+                        </p>
                       </div>
                       {depStatus === "held" && (
                         <Button
@@ -308,7 +319,7 @@ export default function DepositsPage() {
                             setRefundDialogOpen(true);
                           }}
                         >
-                          คืนเงิน
+                          {t("deposits.refundBtn")}
                         </Button>
                       )}
                     </div>
@@ -322,7 +333,9 @@ export default function DepositsPage() {
             <Card>
               <CardContent className="pt-6 text-center py-12">
                 <PiggyBank className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground">ไม่พบเงินประกัน</p>
+                <p className="text-muted-foreground">
+                  {t("deposits.notFound")}
+                </p>
               </CardContent>
             </Card>
           )}
@@ -343,30 +356,34 @@ export default function DepositsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>คืนเงินประกัน</DialogTitle>
+            <DialogTitle>{t("deposits.refundDialogTitle")}</DialogTitle>
             <DialogDescription>
-              ระบุจำนวนเงินที่จะคืนให้ผู้เช่า
+              {t("deposits.refundDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium">ผู้เช่า</p>
+              <p className="text-sm font-medium">{t("contracts.tenant")}</p>
               <p>
-                {selectedContract?.tenant_name} — ห้อง{" "}
+                {selectedContract?.tenant_name} — {t("contracts.room")}{" "}
                 {selectedContract?.room_number}
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium">เงินประกันทั้งหมด</p>
+              <p className="text-sm font-medium">
+                {t("deposits.totalDeposit")}
+              </p>
               <p className="text-lg font-bold">
                 {Number(selectedContract?.deposit_amount ?? 0).toLocaleString(
                   "th-TH",
                 )}{" "}
-                บาท
+                {t("contracts.baht")}
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium">เงินที่คืน</label>
+              <label className="text-sm font-medium">
+                {t("deposits.refundAmount")}
+              </label>
               <Input
                 type="number"
                 value={refundAmount}
@@ -375,9 +392,9 @@ export default function DepositsPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">หมายเหตุ</label>
+              <label className="text-sm font-medium">{t("common.note")}</label>
               <Textarea
-                placeholder="เช่น หักค่าเสียหาย 500 บาท ฯลฯ"
+                placeholder={t("deposits.notePlaceholder")}
                 value={refundNotes}
                 onChange={(e) => setRefundNotes(e.target.value)}
                 className="mt-1"
@@ -393,7 +410,7 @@ export default function DepositsPage() {
               ) : (
                 <Check className="w-4 h-4" />
               )}
-              ยืนยันการคืนเงิน
+              {t("deposits.confirmRefund")}
             </Button>
           </div>
         </DialogContent>

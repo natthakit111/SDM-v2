@@ -62,6 +62,17 @@ const translations: Record<string, { th: string; en: string }> = {
   "common.submit": { th: "ส่ง", en: "Submit" },
   "common.viewAll": { th: "ดูทั้งหมด", en: "View all" },
   "common.created": { th: "วันที่สร้าง", en: "Created date" },
+  "common.createdAt": { th: "วันที่สร้าง", en: "Created At" },
+  "common.firstName": { th: "ชื่อ", en: "First Name" },
+  "common.lastName": { th: "นามสกุล", en: "Last Name" },
+  "common.username": { th: "ชื่อผู้ใช้", en: "Username" },
+  "common.password": { th: "รหัสผ่าน", en: "Password" },
+  "common.contact": { th: "ติดต่อ", en: "Contact" },
+  "common.allStatus": { th: "ทุกสถานะ", en: "All Statuses" },
+  "common.error": { th: "เกิดข้อผิดพลาด", en: "An error occurred" },
+  "common.saveSuccess": { th: "บันทึกสำเร็จ", en: "Saved successfully" },
+  "common.deleteSuccess": { th: "ลบสำเร็จ", en: "Deleted successfully" },
+  "common.confirmDelete": { th: "ยืนยันการลบ?", en: "Confirm delete?" },
 
   // ── Status ─────────────────────────────────────────────────────────────────
   "status.active": { th: "ใช้งานอยู่", en: "Active" },
@@ -82,6 +93,9 @@ const translations: Record<string, { th: string; en: string }> = {
   "status.in_progress": { th: "กำลังดำเนินการ", en: "In Progress" },
   "status.verified": { th: "ยืนยันแล้ว", en: "Verified" },
   "status.pending_verify": { th: "รอยืนยัน", en: "Pending Verify" },
+  "status.active.label": { th: "ใช้งานอยู่", en: "Active" },
+  "status.expired.label": { th: "หมดอายุ", en: "Expired" },
+  "status.terminated.label": { th: "ยกเลิกแล้ว", en: "Terminated" },
 
   // ── Priority ───────────────────────────────────────────────────────────────
   "priority.low": { th: "ไม่ด่วน", en: "Low" },
@@ -148,6 +162,24 @@ const translations: Record<string, { th: string; en: string }> = {
     th: "ค้นหาชื่อ, อีเมล, เบอร์โทร หรือเลขบัตร...",
     en: "Search name, email, phone or ID...",
   },
+  "tenants.edit": { th: "แก้ไขข้อมูลผู้เช่า", en: "Edit Tenant" },
+  "tenants.addNew": { th: "เพิ่มผู้เช่าใหม่", en: "Add New Tenant" },
+  "tenants.editDesc": {
+    th: "แก้ไขข้อมูลผู้เช่า",
+    en: "Edit tenant information",
+  },
+  "tenants.addDesc": {
+    th: "กรอกข้อมูลผู้เช่าใหม่",
+    en: "Fill in new tenant information",
+  },
+  "tenants.emergencyName": {
+    th: "ผู้ติดต่อฉุกเฉิน",
+    en: "Emergency Contact Name",
+  },
+  "tenants.cannotDeleteActive": {
+    th: "ไม่สามารถลบผู้เช่าที่มีสัญญาอยู่ได้",
+    en: "Cannot delete tenant with active contract",
+  },
 
   // ── Contracts ──────────────────────────────────────────────────────────────
   "contracts.title": { th: "สัญญาเช่า", en: "Rental Contracts" },
@@ -166,6 +198,75 @@ const translations: Record<string, { th: string; en: string }> = {
   "contracts.searchPlaceholder": {
     th: "ค้นหา ชื่อ ห้อง หรือ ID...",
     en: "Search name, room or ID...",
+  },
+  "contracts.newTitle": { th: "สร้างสัญญาเช่าใหม่", en: "Create New Contract" },
+  "contracts.newDesc": {
+    th: "กรอกข้อมูลสัญญาเช่า",
+    en: "Fill in contract details",
+  },
+  "contracts.tenant": { th: "ผู้เช่า", en: "Tenant" },
+  "contracts.selectTenant": { th: "เลือกผู้เช่า", en: "Select tenant" },
+  "contracts.availableRoom": {
+    th: "ห้องพัก (ว่างอยู่)",
+    en: "Room (Available)",
+  },
+  "contracts.selectRoom": { th: "เลือกห้อง", en: "Select room" },
+  "contracts.rentAmountBaht": {
+    th: "ค่าเช่า/เดือน (บาท)",
+    en: "Rent/Month (THB)",
+  },
+  "contracts.useRoomRent": { th: "ใช้ค่าเช่าจากห้อง", en: "Use room's rent" },
+  "contracts.depositBaht": { th: "เงินประกัน (บาท)", en: "Deposit (THB)" },
+  "contracts.noteExtra": { th: "หมายเหตุเพิ่มเติม", en: "Additional note" },
+  "contracts.create": { th: "สร้างสัญญา", en: "Create Contract" },
+  "contracts.statsTotal": { th: "รวมทั้งหมด", en: "Total" },
+  "contracts.statsActive": { th: "ใช้งานอยู่", en: "Active" },
+  "contracts.statsExpiredOrTerminated": {
+    th: "หมดอายุ/ยกเลิก",
+    en: "Expired/Terminated",
+  },
+  "contracts.statsTotalDeposit": { th: "รวมเงินประกัน", en: "Total Deposit" },
+  "contracts.notFound": { th: "ไม่พบสัญญาเช่า", en: "No contracts found" },
+  "contracts.detailTitle": {
+    th: "รายละเอียดสัญญาเช่า",
+    en: "Contract Details",
+  },
+  "contracts.tenantName": { th: "ชื่อผู้เช่า", en: "Tenant Name" },
+  "contracts.room": { th: "ห้อง", en: "Room" },
+  "contracts.monthlyRent": { th: "ค่าเช่ารายเดือน", en: "Monthly Rent" },
+  "contracts.terminateAction": {
+    th: "ยกเลิกสัญญา (Check-out)",
+    en: "Terminate Contract (Check-out)",
+  },
+  "contracts.rentLabel": { th: "ค่าเช่า", en: "Rent" },
+  "contracts.depositLabel": { th: "เงินประกัน", en: "Deposit" },
+  "contracts.baht": { th: "บาท", en: "THB" },
+  "contracts.perMonth": { th: "บาท/เดือน", en: "THB/month" },
+  "contracts.confirmTerminate": {
+    th: "ต้องการยกเลิกสัญญาของ",
+    en: "Confirm termination of contract for",
+  },
+  "contracts.confirmTerminate2": { th: "ห้อง", en: "room" },
+  "contracts.confirmTerminate3": { th: "หรือไม่?", en: "?" },
+  "contracts.loadError": {
+    th: "โหลดข้อมูลสัญญาไม่สำเร็จ",
+    en: "Failed to load contracts",
+  },
+  "contracts.createSuccess": {
+    th: "สร้างสัญญาเรียบร้อย",
+    en: "Contract created successfully",
+  },
+  "contracts.createError": {
+    th: "สร้างสัญญาไม่สำเร็จ",
+    en: "Failed to create contract",
+  },
+  "contracts.terminateSuccess": {
+    th: "ยกเลิกสัญญาเรียบร้อย",
+    en: "Contract terminated successfully",
+  },
+  "contracts.terminateError": {
+    th: "ยกเลิกสัญญาไม่สำเร็จ",
+    en: "Failed to terminate contract",
   },
 
   // ── Bills ──────────────────────────────────────────────────────────────────
@@ -191,51 +292,157 @@ const translations: Record<string, { th: string; en: string }> = {
     en: "Search room or tenant...",
   },
 
-  // ── Meters ─────────────────────────────────────────────────────────────────
-  "meters.title": { th: "บันทึกมิเตอร์", en: "Meter Readings" },
-  "meters.subtitle": {
-    th: "บันทึกค่ามิเตอร์ไฟฟ้าและน้ำประปา",
-    en: "Record electric and water meter readings",
+  // ── Payments (admin shared) ────────────────────────────────────────────────
+  "payment.loadError": { th: "โหลดข้อมูลไม่สำเร็จ", en: "Failed to load data" },
+  "payment.actionError": { th: "เกิดข้อผิดพลาด", en: "An error occurred" },
+  "payment.searchPlaceholder": {
+    th: "ค้นหา ชื่อ ห้อง บิล หรือ ID...",
+    en: "Search name, room, bill or ID...",
   },
-  "meters.record": { th: "บันทึกมิเตอร์", en: "Record Meter" },
-  "meters.electric": { th: "มิเตอร์ไฟฟ้า", en: "Electric Meter" },
-  "meters.water": { th: "มิเตอร์น้ำ", en: "Water Meter" },
-  "meters.previous": { th: "เลขก่อนหน้า", en: "Previous Reading" },
-  "meters.current": { th: "เลขปัจจุบัน", en: "Current Reading" },
-  "meters.used": { th: "ใช้ไป", en: "Used" },
-  "meters.rate": { th: "อัตรา", en: "Rate" },
-  "meters.image": { th: "รูปมิเตอร์", en: "Meter Image" },
-  "meters.list": { th: "รายการมิเตอร์", en: "Meter List" },
-  "meters.recordedAt": { th: "บันทึกเมื่อ", en: "Recorded At" },
+  "payment.billNo": { th: "บิล", en: "Bill" },
+  "payment.method": { th: "วิธีชำระ", en: "Payment Method" },
+  "payment.allMethods": { th: "วิธีทั้งหมด", en: "All Methods" },
+  "payment.methodQR": { th: "พร้อมเพย์", en: "PromptPay" },
+  "payment.methodCash": { th: "เงินสด", en: "Cash" },
+  "payment.methodTransfer": { th: "โอนเงิน", en: "Bank Transfer" },
+  "payment.paidOn": { th: "ชำระ", en: "Paid" },
+  "payment.paidDate": { th: "วันที่ชำระ", en: "Paid Date" },
+  "payment.approvedOn": { th: "อนุมัติ", en: "Approved" },
+  "payment.rejectedOn": { th: "ปฏิเสธเมื่อ", en: "Rejected on" },
+  "payment.approvedBy": { th: "อนุมัติโดย", en: "Approved by" },
+  "payment.processedBy": { th: "ดำเนินการโดย", en: "Processed by" },
+  "payment.slip": { th: "รูปสลิป", en: "Slip Image" },
+  "payment.noSlip": { th: "ไม่มีสลิป", en: "No slip" },
+  "payment.viewFullImage": { th: "ดูรูปขนาดเต็ม", en: "View full image" },
+  "payment.detailTitle": { th: "รายละเอียดการชำระเงิน", en: "Payment Details" },
+  "payment.approveSuccess": {
+    th: "อนุมัติการชำระเงินเรียบร้อย",
+    en: "Payment approved successfully",
+  },
+  "payment.rejectSuccess": {
+    th: "ปฏิเสธการชำระเงินแล้ว",
+    en: "Payment rejected",
+  },
+  "payment.reject": { th: "ปฏิเสธ", en: "Reject" },
+  "payment.rejectDialogTitle": {
+    th: "ปฏิเสธการชำระเงิน",
+    en: "Reject Payment",
+  },
+  "payment.rejectDialogDesc": {
+    th: "ระบุเหตุผลในการปฏิเสธ",
+    en: "Specify the reason for rejection",
+  },
+  "payment.rejectReason": { th: "เหตุผล", en: "Reason" },
+  "payment.rejectReasonRequired": {
+    th: "กรุณาระบุเหตุผล",
+    en: "Please enter a reason",
+  },
+  "payment.rejectReasonPlaceholder": {
+    th: "เช่น จำนวนเงินไม่ตรง, สลิปไม่ชัดเจน ฯลฯ",
+    en: "e.g. Amount mismatch, slip unclear, etc.",
+  },
+  "payment.confirmReject": { th: "ยืนยันการปฏิเสธ", en: "Confirm Rejection" },
+  "payment.exportSuccess": {
+    th: "ส่งออก {fmt} เรียบร้อย",
+    en: "Exported {fmt} successfully",
+  },
+  "payment.exportError": { th: "ส่งออกไม่สำเร็จ", en: "Export failed" },
 
-  // ── Payments ───────────────────────────────────────────────────────────────
+  // ── Payments (tenant) — ✅ เพิ่มใหม่ ──────────────────────────────────────
   "payments.title": { th: "การชำระเงิน", en: "Payments" },
-  "payments.subtitle": { th: "จัดการการชำระเงิน", en: "Manage payments" },
-  "payments.method": { th: "วิธีการชำระ", en: "Payment Method" },
-  "payments.qr": { th: "สแกน QR Code", en: "Scan QR Code" },
+  "payments.subtitle": {
+    th: "รายการชำระเงินทั้งหมดในระบบ",
+    en: "All payment records in the system",
+  },
+  "payments.totalDue": { th: "ยอดค้างชำระ", en: "Total Due" },
+  "payments.qr": { th: "QR PromptPay", en: "QR PromptPay" },
   "payments.slip": { th: "อัปโหลดสลิป", en: "Upload Slip" },
-  "payments.verify": { th: "ยืนยันการชำระ", en: "Verify Payment" },
-  "payments.reject": { th: "ปฏิเสธ", en: "Reject" },
   "payments.history": { th: "ประวัติการชำระเงิน", en: "Payment History" },
-  "payments.paidAt": { th: "ชำระเมื่อ", en: "Paid At" },
-  "payments.totalDue": { th: "รวมค้างชำระ", en: "Total Due" },
+
+  // ── Payment History ────────────────────────────────────────────────────────
+  "paymentHistory.title": { th: "ประวัติการชำระเงิน", en: "Payment History" },
+  "paymentHistory.subtitle": {
+    th: "รายการชำระเงินที่ผ่านการอนุมัติแล้ว",
+    en: "Verified payment records",
+  },
+  "paymentHistory.statsMonthly": { th: "รายการเดือนนี้", en: "This Month" },
+  "paymentHistory.statsRevenue": {
+    th: "รายรับเดือนนี้",
+    en: "Revenue This Month",
+  },
+  "paymentHistory.statsAll": { th: "ทั้งหมดในระบบ", en: "Total in System" },
+  "paymentHistory.notFound": { th: "ไม่พบรายการใน", en: "No records in" },
+
+  // ── Payment Verification ───────────────────────────────────────────────────
+  "paymentVerify.title": {
+    th: "ตรวจสอบการชำระเงิน",
+    en: "Payment Verification",
+  },
+  "paymentVerify.subtitle": {
+    th: "ตรวจสอบและอนุมัติการชำระเงินจากสลิป",
+    en: "Review and approve payments from slips",
+  },
+  "paymentVerify.statsTotal": { th: "รวมทั้งหมด", en: "Total" },
+  "paymentVerify.statsPending": { th: "รอการตรวจสอบ", en: "Pending Review" },
+  "paymentVerify.statsVerified": { th: "ตรวจสอบแล้ว", en: "Verified" },
+  "paymentVerify.statsRejected": { th: "ปฏิเสธ", en: "Rejected" },
 
   // ── Maintenance ────────────────────────────────────────────────────────────
   "maintenance.title": { th: "จัดการแจ้งซ่อม", en: "Maintenance Management" },
   "maintenance.subtitle": {
     th: "รับและจัดการรายการแจ้งซ่อมจากผู้เช่า",
-    en: "Receive and manage maintenance requests from tenants",
+    en: "Receive and manage repair requests from tenants",
   },
-  "maintenance.request": { th: "แจ้งซ่อม", en: "Request Maintenance" },
-  "maintenance.category": { th: "หมวดหมู่", en: "Category" },
-  "maintenance.description": { th: "รายละเอียด", en: "Description" },
-  "maintenance.assignedTo": { th: "มอบหมายให้", en: "Assigned To" },
-  "maintenance.adminNote": { th: "หมายเหตุ", en: "Admin Note" },
-  "maintenance.list": { th: "รายการแจ้งซ่อม", en: "Maintenance List" },
-  "maintenance.pending": { th: "รอดำเนินการ", en: "Pending" },
+  "maintenance.allStatuses": { th: "สถานะทั้งหมด", en: "All Statuses" },
   "maintenance.searchPlaceholder": {
     th: "ค้นหาหมายเลขห้อง, หมวดหมู่ หรือชื่อผู้เช่า...",
     en: "Search room, category or tenant...",
+  },
+  "maintenance.pendingAlert": {
+    th: "มี {n} รายการที่รอดำเนินการ",
+    en: "{n} items pending action",
+  },
+  "maintenance.listTitle": { th: "รายการแจ้งซ่อม", en: "Maintenance Requests" },
+  "maintenance.list": { th: "รายการแจ้งซ่อม", en: "Maintenance List" },
+  "maintenance.totalItems": {
+    th: "ทั้งหมด {n} รายการ",
+    en: "{n} records total",
+  },
+  "maintenance.colReporter": { th: "ผู้แจ้ง", en: "Reporter" },
+  "maintenance.colCategory": { th: "หมวดหมู่", en: "Category" },
+  "maintenance.colPriority": { th: "ความสำคัญ", en: "Priority" },
+  "maintenance.colReportedAt": { th: "แจ้งเมื่อ", en: "Reported At" },
+  "maintenance.notFound": {
+    th: "ไม่พบรายการแจ้งซ่อมที่ตรงกับการค้นหา",
+    en: "No maintenance requests found",
+  },
+  "maintenance.detailTitle": {
+    th: "รายละเอียดการแจ้งซ่อม",
+    en: "Maintenance Request Details",
+  },
+  "maintenance.detailDesc": {
+    th: "ดูรายละเอียดและอัปเดตสถานะ",
+    en: "View details and update status",
+  },
+  "maintenance.description": { th: "รายละเอียด", en: "Description" },
+  "maintenance.assignedTo": { th: "มอบหมายให้", en: "Assigned To" },
+  "maintenance.assignedPlaceholder": {
+    th: "ชื่อช่างหรือผู้รับผิดชอบ",
+    en: "Technician or responsible person",
+  },
+  "maintenance.notePlaceholder": {
+    th: "บันทึกเพิ่มเติม...",
+    en: "Additional notes...",
+  },
+  "maintenance.adminNote": { th: "หมายเหตุแอดมิน", en: "Admin Note" },
+  "maintenance.updateSuccess": {
+    th: "อัปเดตรายการแจ้งซ่อมเรียบร้อย",
+    en: "Maintenance request updated successfully",
+  },
+  "maintenance.updateError": { th: "อัปเดตไม่สำเร็จ", en: "Failed to update" },
+  "maintenance.loadError": {
+    th: "โหลดข้อมูลไม่สำเร็จ",
+    en: "Failed to load data",
   },
 
   // ── Announcements ──────────────────────────────────────────────────────────
@@ -261,26 +468,595 @@ const translations: Record<string, { th: string; en: string }> = {
   "announcements.others": { th: "ประกาศอื่น", en: "Other Announcements" },
   "announcements.empty": { th: "ยังไม่มีประกาศ", en: "No announcements yet" },
 
+  // ── Meters ─────────────────────────────────────────────────────────────────
+  "meters.title": { th: "บันทึกมิเตอร์", en: "Meter Readings" },
+  "meters.subtitle": {
+    th: "บันทึกค่ามิเตอร์ไฟฟ้าและน้ำประปา",
+    en: "Record electric and water meter readings",
+  },
+  "meters.addBtn": { th: "บันทึกมิเตอร์", en: "Record Meter" },
+  "meters.searchPlaceholder": {
+    th: "ค้นหาหมายเลขห้อง...",
+    en: "Search room number...",
+  },
+  "meters.allMonths": { th: "เดือนทั้งหมด", en: "All Months" },
+  "meters.listTitle": { th: "รายการมิเตอร์", en: "Meter List" },
+  "meters.totalItems": { th: "ทั้งหมด {n} รายการ", en: "{n} records total" },
+  "meters.colRoom": { th: "ห้อง", en: "Room" },
+  "meters.colMonthYear": { th: "เดือน/ปี", en: "Month/Year" },
+  "meters.colElectric": { th: "ไฟฟ้า (หน่วย)", en: "Electric (units)" },
+  "meters.colWater": { th: "น้ำ (หน่วย)", en: "Water (units)" },
+  "meters.colRecordedAt": { th: "บันทึกเมื่อ", en: "Recorded At" },
+  "meters.notFound": {
+    th: "ไม่พบรายการมิเตอร์",
+    en: "No meter readings found",
+  },
+  "meters.viewPhotos": { th: "ดูรูปภาพ", en: "View Photos" },
+  "meters.addTitle": { th: "บันทึกมิเตอร์ใหม่", en: "New Meter Reading" },
+  "meters.editTitle": { th: "แก้ไขมิเตอร์", en: "Edit Meter Reading" },
+  "meters.dialogDesc": {
+    th: "กรอกค่ามิเตอร์ไฟฟ้าและน้ำประปา",
+    en: "Enter electric and water meter values",
+  },
+  "meters.electricMeter": { th: "มิเตอร์ไฟฟ้า", en: "Electric Meter" },
+  "meters.waterMeter": { th: "มิเตอร์น้ำ", en: "Water Meter" },
+  "meters.rate": { th: "อัตรา", en: "Rate" },
+  "meters.bahtPerUnit": { th: "บาท/หน่วย", en: "THB/unit" },
+  "meters.previousUnit": { th: "เลขก่อนหน้า", en: "Previous Reading" },
+  "meters.currentUnit": { th: "เลขปัจจุบัน", en: "Current Reading" },
+  "meters.elecPhotoLabel": {
+    th: "รูปมิเตอร์ไฟฟ้า (ไม่บังคับ)",
+    en: "Electric Meter Photo (optional)",
+  },
+  "meters.waterPhotoLabel": {
+    th: "รูปมิเตอร์น้ำ (ไม่บังคับ)",
+    en: "Water Meter Photo (optional)",
+  },
+  "meters.uploadElecPhoto": {
+    th: "อัปโหลดรูปมิเตอร์ไฟฟ้า",
+    en: "Upload Electric Meter Photo",
+  },
+  "meters.uploadWaterPhoto": {
+    th: "อัปโหลดรูปมิเตอร์น้ำ",
+    en: "Upload Water Meter Photo",
+  },
+  "meters.noPhoto": { th: "ไม่มีรูป", en: "No photo" },
+  "meters.photoDialogTitle": {
+    th: "รูปมิเตอร์ห้อง",
+    en: "Meter Photos — Room",
+  },
+  "meters.errorSelectRoom": {
+    th: "กรุณาเลือกห้อง",
+    en: "Please select a room",
+  },
+  "meters.errorAtLeastOne": {
+    th: "กรุณากรอกค่ามิเตอร์อย่างน้อย 1 ประเภท",
+    en: "Please enter at least one meter reading",
+  },
+  "meters.errorElecOrder": {
+    th: "ไฟฟ้า: ค่าปัจจุบันต้องมากกว่าก่อนหน้า",
+    en: "Electric: current must be greater than previous",
+  },
+  "meters.errorWaterOrder": {
+    th: "น้ำ: ค่าปัจจุบันต้องมากกว่าก่อนหน้า",
+    en: "Water: current must be greater than previous",
+  },
+  "meters.saveSuccess": {
+    th: "บันทึกมิเตอร์เรียบร้อย",
+    en: "Meter reading saved successfully",
+  },
+  "meters.updateSuccess": {
+    th: "อัปเดตมิเตอร์เรียบร้อย",
+    en: "Meter reading updated successfully",
+  },
+  "meters.saveError": { th: "เกิดข้อผิดพลาด", en: "An error occurred" },
+  "meters.loadError": { th: "โหลดข้อมูลไม่สำเร็จ", en: "Failed to load data" },
+  "meters.image": { th: "รูปมิเตอร์", en: "Meter Photo" },
+  "meters.used": { th: "หน่วย", en: "units" },
+  "meters.electric": { th: "ไฟฟ้า", en: "Electric" },
+  "meters.water": { th: "น้ำ", en: "Water" },
+
+  // ── Deposits ───────────────────────────────────────────────────────────────
+  "deposits.title": { th: "เงินประกัน", en: "Deposits" },
+  "deposits.subtitle": {
+    th: "จัดการเงินประกันและการคืนเงิน",
+    en: "Manage deposits and refunds",
+  },
+  "deposits.statsTotal": { th: "รวมทั้งหมด", en: "Total" },
+  "deposits.statusHeld": { th: "เก็บไว้", en: "Held" },
+  "deposits.statusRefunded": { th: "คืนเงินแล้ว", en: "Refunded" },
+  "deposits.statusDeducted": { th: "หักเงิน", en: "Deducted" },
+  "deposits.searchPlaceholder": {
+    th: "ค้นหา ชื่อ ห้อง หรือ ID...",
+    en: "Search name, room or ID...",
+  },
+  "deposits.depositedOn": { th: "ฝากเมื่อ", en: "Deposited on" },
+  "deposits.returnedOn": { th: "คืนเมื่อ", en: "Returned on" },
+  "deposits.refundBtn": { th: "คืนเงิน", en: "Refund" },
+  "deposits.notFound": { th: "ไม่พบเงินประกัน", en: "No deposits found" },
+  "deposits.refundDialogTitle": { th: "คืนเงินประกัน", en: "Refund Deposit" },
+  "deposits.refundDialogDesc": {
+    th: "ระบุจำนวนเงินที่จะคืนให้ผู้เช่า",
+    en: "Specify the amount to refund to the tenant",
+  },
+  "deposits.totalDeposit": { th: "เงินประกันทั้งหมด", en: "Total Deposit" },
+  "deposits.refundAmount": { th: "เงินที่คืน", en: "Refund Amount" },
+  "deposits.notePlaceholder": {
+    th: "เช่น หักค่าเสียหาย 500 บาท ฯลฯ",
+    en: "e.g. Deducted 500 THB for damages, etc.",
+  },
+  "deposits.confirmRefund": { th: "ยืนยันการคืนเงิน", en: "Confirm Refund" },
+  "deposits.refundSuccess": {
+    th: "บันทึกการคืนมัดจำเรียบร้อย",
+    en: "Deposit refund recorded successfully",
+  },
+  "deposits.refundError": { th: "เกิดข้อผิดพลาด", en: "An error occurred" },
+  "deposits.loadError": {
+    th: "โหลดข้อมูลไม่สำเร็จ",
+    en: "Failed to load data",
+  },
+
+  // ── Auth / Register / Login ────────────────────────────────────────────────
+  "register.title": { th: "สมัครสมาชิก", en: "Create Account" },
+  "register.subtitle": {
+    th: "สร้างบัญชีใหม่เพื่อเข้าใช้งานระบบ",
+    en: "Create a new account to get started",
+  },
+  "register.fullName": { th: "ชื่อ-นามสกุล", en: "Full Name" },
+  "register.fullNamePlaceholder": { th: "สมชาย ใจดี", en: "John Doe" },
+  "register.usernamePlaceholder": {
+    th: "ชื่อผู้ใช้สำหรับล็อกอิน",
+    en: "Login username",
+  },
+  "register.confirmPassword": { th: "ยืนยันรหัสผ่าน", en: "Confirm Password" },
+  "register.submit": { th: "สมัครสมาชิก", en: "Create Account" },
+  "register.loading": { th: "กำลังสมัครสมาชิก...", en: "Creating account..." },
+  "register.hasAccount": {
+    th: "มีบัญชีอยู่แล้ว?",
+    en: "Already have an account?",
+  },
+  "register.login": { th: "เข้าสู่ระบบ", en: "Sign in" },
+  "register.errorPasswordMismatch": {
+    th: "รหัสผ่านไม่ตรงกัน",
+    en: "Passwords do not match",
+  },
+  "register.errorPasswordLength": {
+    th: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร",
+    en: "Password must be at least 6 characters",
+  },
+
+  // ── Settings ───────────────────────────────────────────────────────────────
+  "settings.title": { th: "ตั้งค่าระบบ", en: "System Settings" },
+  "settings.subtitle": {
+    th: "จัดการการตั้งค่าและกำหนดค่าของระบบ",
+    en: "Manage system settings and configuration",
+  },
+  "settings.tabGeneral": { th: "ทั่วไป", en: "General" },
+  "settings.tabFinancial": { th: "การเงิน", en: "Financial" },
+  "settings.tabNotifications": { th: "แจ้งเตือน", en: "Notifications" },
+  "settings.tabSecurity": { th: "ความปลอดภัย", en: "Security" },
+  "settings.generalTitle": { th: "ข้อมูลทั่วไป", en: "General Information" },
+  "settings.generalDesc": {
+    th: "จัดการข้อมูลหอพักและข้อมูลผู้ดูแล",
+    en: "Manage dormitory and admin information",
+  },
+  "settings.dormName": { th: "ชื่อหอพัก", en: "Dormitory Name" },
+  "settings.dormAddress": { th: "ที่อยู่", en: "Address" },
+  "settings.adminEmail": { th: "อีเมลผู้ดูแล", en: "Admin Email" },
+  "settings.currency": { th: "สกุลเงิน", en: "Currency" },
+  "settings.currencyTHB": { th: "บาทไทย (THB)", en: "Thai Baht (THB)" },
+  "settings.currencyUSD": { th: "ดอลลาร์สหรัฐ (USD)", en: "US Dollar (USD)" },
+  "settings.taxRate": { th: "อัตราภาษี (%)", en: "Tax Rate (%)" },
+  "settings.saveGeneral": { th: "บันทึกการตั้งค่า", en: "Save Settings" },
+  "settings.financialTitle": {
+    th: "ข้อมูลการเงิน",
+    en: "Financial Information",
+  },
+  "settings.financialDesc": {
+    th: "จัดการข้อมูลธนาคารและการชำระเงิน",
+    en: "Manage bank and payment information",
+  },
+  "settings.bankName": { th: "ชื่อธนาคาร", en: "Bank Name" },
+  "settings.bankAccount": {
+    th: "หมายเลขบัญชีธนาคาร",
+    en: "Bank Account Number",
+  },
+  "settings.bankAccountName": {
+    th: "ชื่อเจ้าของบัญชี",
+    en: "Account Holder Name",
+  },
+  "settings.saveFinancial": {
+    th: "บันทึกข้อมูลการเงิน",
+    en: "Save Financial Info",
+  },
+  "settings.notifyTitle": { th: "การแจ้งเตือน", en: "Notifications" },
+  "settings.notifyDesc": {
+    th: "กำหนดการแจ้งเตือนต่างๆ ของระบบ",
+    en: "Configure system notifications",
+  },
+  "settings.notifyPayment": {
+    th: "แจ้งเตือนการชำระเงิน",
+    en: "Payment Notifications",
+  },
+  "settings.notifyPaymentSub": {
+    th: "ส่งอีเมลแจ้งเตือนเมื่อมีการชำระเงิน",
+    en: "Send email when payment is received",
+  },
+  "settings.notifyMaintenance": {
+    th: "แจ้งเตือนการซ่อมแซม",
+    en: "Maintenance Notifications",
+  },
+  "settings.notifyMaintenanceSub": {
+    th: "ส่งแจ้งเตือนเมื่อมีการแจ้งซ่อม",
+    en: "Send notification when maintenance is requested",
+  },
+  "settings.notifyOverdue": {
+    th: "แจ้งเตือนเงินค้างชำระ",
+    en: "Overdue Notifications",
+  },
+  "settings.notifyOverdueSub": {
+    th: "ส่งอีเมลแจ้งเตือนเมื่อมีเงินค้างชำระ",
+    en: "Send email when payment is overdue",
+  },
+  "settings.saveNotifications": {
+    th: "บันทึกการตั้งค่าการแจ้งเตือน",
+    en: "Save Notification Settings",
+  },
+  "settings.telegramTitle": {
+    th: "ตั้งค่า Telegram Bot",
+    en: "Telegram Bot Setup",
+  },
+  "settings.telegramDesc": {
+    th: "เชื่อมต่อ Telegram Bot สำหรับการแจ้งเตือน",
+    en: "Connect Telegram Bot for notifications",
+  },
+  "settings.telegramStep1Title": {
+    th: "สร้าง Telegram Bot",
+    en: "Create a Telegram Bot",
+  },
+  "settings.telegramStep1Desc": {
+    th: "สร้าง Bot ผ่าน @BotFather แล้วนำ Token ไปใส่ใน .env ของ backend",
+    en: "Create a bot via @BotFather and add the token to your backend .env",
+  },
+  "settings.tgInstruct1": {
+    th: "เปิด Telegram แล้วค้นหา",
+    en: "Open Telegram and search for",
+  },
+  "settings.tgInstruct1b": { th: "แล้วกด Start", en: "then tap Start" },
+  "settings.tgInstruct2": { th: "พิมพ์", en: "Type" },
+  "settings.tgInstruct3": {
+    th: "ตั้งชื่อ bot แล้วคัดลอก Bot Token ที่ได้รับ",
+    en: "Name your bot and copy the Bot Token",
+  },
+  "settings.tgInstruct4": {
+    th: "เพิ่ม Token ใน .env backend:",
+    en: "Add the token to backend .env as",
+  },
+  "settings.tgInstruct4b": { th: "", en: "" },
+  "settings.tgBotUsername": {
+    th: "ชื่อผู้ใช้ของ Bot (@username)",
+    en: "Bot Username (@username)",
+  },
+  "settings.tgBotUsernameHint": {
+    th: "ใส่ไว้เพื่อแสดง link ให้ผู้เช่าใช้งาน",
+    en: "Used to show a link to tenants",
+  },
+  "settings.telegramStep2Title": {
+    th: "เชื่อม Telegram ของ Admin",
+    en: "Link Admin Telegram Account",
+  },
+  "settings.telegramStep2Desc": {
+    th: "เชื่อม Telegram ของคุณเพื่อรับแจ้งเตือนการชำระเงินและแจ้งซ่อม",
+    en: "Link your Telegram to receive payment and maintenance alerts",
+  },
+  "settings.tgLinkHowTo": {
+    th: "วิธีรับ Chat ID:",
+    en: "How to get your Chat ID:",
+  },
+  "settings.tgLinkStep1": { th: "เปิด Bot ของคุณ:", en: "Open your bot:" },
+  "settings.tgLinkStep2": { th: "พิมพ์คำสั่ง", en: "Send the command" },
+  "settings.tgLinkStep3": {
+    th: "หรือหา Chat ID ที่",
+    en: "Or find Chat ID at",
+  },
+  "settings.tgChatIdPlaceholder": {
+    th: "กรอก Chat ID เช่น 123456789",
+    en: "Enter Chat ID e.g. 123456789",
+  },
+  "settings.tgChatIdRequired": {
+    th: "กรุณากรอก Chat ID",
+    en: "Please enter Chat ID",
+  },
+  "settings.telegramLink": { th: "เชื่อมต่อ", en: "Link" },
+  "settings.telegramUnlink": { th: "ยกเลิกการเชื่อมต่อ", en: "Unlink" },
+  "settings.telegramUnlinkConfirm": {
+    th: "ยืนยันการยกเลิกเชื่อมต่อ Telegram?",
+    en: "Confirm unlink Telegram?",
+  },
+  "settings.telegramStep3Title": {
+    th: "ให้ผู้เช่าเชื่อมต่อ",
+    en: "Tenant Setup",
+  },
+  "settings.telegramStep3Desc": {
+    th: "แชร์ชื่อ Bot ให้ผู้เช่าทุกคนเชื่อมต่อด้วยตัวเอง",
+    en: "Share the bot username so tenants can link their accounts themselves",
+  },
+  "settings.tgTenantStep1": {
+    th: "ผู้เช่าเปิด Bot:",
+    en: "Tenant opens the bot:",
+  },
+  "settings.tgTenantStep2": { th: "พิมพ์คำสั่ง", en: "Send the command" },
+  "settings.tgTenantStep2b": {
+    th: "(ใช้ username ที่ล็อกอินในแอป)",
+    en: "(use their app login username)",
+  },
+  "settings.tgTenantStep3": {
+    th: "Bot จะยืนยันและเชื่อมต่ออัตโนมัติ",
+    en: "The bot will confirm and link automatically",
+  },
+  "settings.telegramConnected": { th: "เชื่อมต่อสำเร็จ", en: "Connected" },
+  "settings.telegramConnectedSub": {
+    th: "ระบบจะส่งการแจ้งเตือนผ่าน Telegram",
+    en: "System will send notifications via Telegram",
+  },
+  "settings.telegramDisconnected": {
+    th: "ยกเลิกการเชื่อมต่อ Telegram แล้ว",
+    en: "Telegram disconnected",
+  },
+  "settings.telegramBroadcastTitle": {
+    th: "ส่งข้อความหาผู้เช่าทุกคน",
+    en: "Broadcast to All Tenants",
+  },
+  "settings.telegramBroadcastDesc": {
+    th: "ส่งข้อความหาผู้เช่าทุกคนที่เชื่อมต่อ Telegram แล้ว",
+    en: "Send a message to all tenants who have linked Telegram",
+  },
+  "settings.telegramBroadcastPlaceholder": {
+    th: "พิมพ์ข้อความที่ต้องการส่ง...",
+    en: "Type your message...",
+  },
+  "settings.telegramBroadcastSend": { th: "ส่งข้อความ", en: "Send Message" },
+  "settings.telegramBroadcastRequired": {
+    th: "กรุณากรอกข้อความ",
+    en: "Please enter a message",
+  },
+  "settings.telegramBroadcastSuccess": {
+    th: "ส่งข้อความสำเร็จ {n} คน",
+    en: "Message sent to {n} tenant(s)",
+  },
+  "settings.telegramBroadcastError": {
+    th: "ส่งข้อความไม่สำเร็จ",
+    en: "Failed to send message",
+  },
+  "settings.securityTitle": { th: "ความปลอดภัย", en: "Security" },
+  "settings.securityDesc": {
+    th: "จัดการรหัสผ่านและความปลอดภัย",
+    en: "Manage password and security",
+  },
+  "settings.oldPassword": { th: "รหัสผ่านเดิม", en: "Current Password" },
+  "settings.oldPasswordPlaceholder": {
+    th: "กรอกรหัสผ่านเดิม",
+    en: "Enter current password",
+  },
+  "settings.newPassword": { th: "รหัสผ่านใหม่", en: "New Password" },
+  "settings.newPasswordPlaceholder": {
+    th: "กรอกรหัสผ่านใหม่",
+    en: "Enter new password",
+  },
+  "settings.confirmPassword": {
+    th: "ยืนยันรหัสผ่านใหม่",
+    en: "Confirm New Password",
+  },
+  "settings.confirmPasswordPlaceholder": {
+    th: "ยืนยันรหัสผ่าน",
+    en: "Confirm password",
+  },
+  "settings.changePassword": { th: "เปลี่ยนรหัสผ่าน", en: "Change Password" },
+  "settings.loadError": {
+    th: "โหลดการตั้งค่าไม่สำเร็จ",
+    en: "Failed to load settings",
+  },
+  "settings.saveError": { th: "บันทึกไม่สำเร็จ", en: "Save failed" },
+  "settings.generalSaveSuccess": {
+    th: "บันทึกการตั้งค่าทั่วไปสำเร็จ",
+    en: "General settings saved successfully",
+  },
+  "settings.financialSaveSuccess": {
+    th: "บันทึกการตั้งค่าการเงินสำเร็จ",
+    en: "Financial settings saved successfully",
+  },
+  "settings.notifySaveSuccess": {
+    th: "บันทึกการตั้งค่าการแจ้งเตือนสำเร็จ",
+    en: "Notification settings saved successfully",
+  },
+  "settings.passwordChangeSuccess": {
+    th: "เปลี่ยนรหัสผ่านสำเร็จ",
+    en: "Password changed successfully",
+  },
+  "settings.errorFillAll": {
+    th: "กรุณากรอกข้อมูลให้ครบถ้วน",
+    en: "Please fill in all required fields",
+  },
+  "settings.errorFillBank": {
+    th: "กรุณากรอกข้อมูลธนาคารให้ครบถ้วน",
+    en: "Please fill in all bank information",
+  },
+  "settings.errorFillPassword": {
+    th: "กรุณากรอกรหัสผ่านให้ครบถ้วน",
+    en: "Please fill in all password fields",
+  },
+  "settings.errorFillTelegram": {
+    th: "กรุณากรอก Bot Token และ Chat ID",
+    en: "Please enter Bot Token and Chat ID",
+  },
+  "settings.errorPasswordMismatch": {
+    th: "รหัสผ่านใหม่ไม่ตรงกัน",
+    en: "New passwords do not match",
+  },
+  "settings.errorPasswordLength": {
+    th: "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร",
+    en: "Password must be at least 6 characters",
+  },
+  "settings.errorOldPassword": {
+    th: "รหัสผ่านเดิมไม่ถูกต้อง",
+    en: "Current password is incorrect",
+  },
+
+  // ── Tenant Telegram ────────────────────────────────────────────────────────
+  "tgTenant.title": {
+    th: "การแจ้งเตือน Telegram",
+    en: "Telegram Notifications",
+  },
+  "tgTenant.subtitle": {
+    th: "เชื่อมต่อ Telegram เพื่อรับแจ้งเตือนบิล การชำระเงิน และข่าวสาร",
+    en: "Link Telegram to receive bill, payment and announcement alerts",
+  },
+  "tgTenant.connected": {
+    th: "เชื่อมต่อ Telegram สำเร็จ",
+    en: "Telegram linked successfully",
+  },
+  "tgTenant.notifyBill": {
+    th: "รับแจ้งเตือนเมื่อมีบิลใหม่",
+    en: "Bill notifications",
+  },
+  "tgTenant.notifyPayment": {
+    th: "รับแจ้งเตือนเมื่อการชำระเงินได้รับการยืนยัน",
+    en: "Payment confirmations",
+  },
+  "tgTenant.notifyMaintenance": {
+    th: "รับอัปเดตสถานะการแจ้งซ่อม",
+    en: "Maintenance status updates",
+  },
+  "tgTenant.notifyAnnouncement": {
+    th: "รับประกาศจากหอพัก",
+    en: "Dormitory announcements",
+  },
+  "tgTenant.howToTitle": {
+    th: "วิธีเชื่อมต่อ Telegram",
+    en: "How to link Telegram",
+  },
+  "tgTenant.howToDesc": {
+    th: "ทำตาม 4 ขั้นตอนนี้เพื่อรับแจ้งเตือนผ่าน Telegram",
+    en: "Follow these 4 steps to receive notifications via Telegram",
+  },
+  "tgTenant.step1": {
+    th: "เปิด Telegram แล้วค้นหา",
+    en: "Open Telegram and find",
+  },
+  "tgTenant.step1b": { th: "แล้วกด Start", en: "then tap Start" },
+  "tgTenant.step2": { th: "พิมพ์คำสั่ง", en: "Send the command" },
+  "tgTenant.step2b": {
+    th: "(username ที่ใช้ login ในแอป)",
+    en: "(your app login username)",
+  },
+  "tgTenant.step3": {
+    th: "Bot จะตอบกลับพร้อม Chat ID ของคุณ — คัดลอกไว้",
+    en: "The bot will reply with your Chat ID — copy it",
+  },
+  "tgTenant.step4": {
+    th: "วาง Chat ID ด้านล่างแล้วกดเชื่อมต่อ",
+    en: "Paste the Chat ID below and tap Link",
+  },
+  "tgTenant.orManual": {
+    th: "กรอก Chat ID ด้วยตัวเอง",
+    en: "Enter Chat ID manually",
+  },
+  "tgTenant.chatIdHint": {
+    th: "หา Chat ID ได้จาก Bot หรือ @userinfobot",
+    en: "Get your Chat ID from the bot or @userinfobot",
+  },
+  "tgTenant.linkSuccess": {
+    th: "เชื่อมต่อ Telegram สำเร็จ! 🎉",
+    en: "Telegram linked successfully! 🎉",
+  },
+  "tgTenant.commandsTitle": { th: "คำสั่งที่ใช้ได้", en: "Available Commands" },
+  "tgTenant.cmdStart": {
+    th: "เชื่อมต่อบัญชีกับระบบ",
+    en: "Link your account to the system",
+  },
+  "tgTenant.cmdStatus": { th: "ดูบิลค้างชำระ", en: "Check pending bills" },
+  "tgTenant.cmdHelp": { th: "ดูคำสั่งทั้งหมด", en: "Show all commands" },
+
   // ── Move-out ───────────────────────────────────────────────────────────────
   "moveout.title": { th: "คำร้องขอย้ายออก", en: "Move-out Requests" },
   "moveout.subtitle": {
     th: "ตรวจสอบและอนุมัติคำร้องขอย้ายออกจากผู้เช่า",
     en: "Review and approve move-out requests from tenants",
   },
+  "moveout.searchPlaceholder": {
+    th: "ค้นหาชื่อผู้เช่า หรือหมายเลขห้อง...",
+    en: "Search tenant name or room number...",
+  },
+  "moveout.allStatuses": { th: "สถานะทั้งหมด", en: "All Statuses" },
+  "moveout.statusPending": { th: "รอพิจารณา", en: "Pending Review" },
+  "moveout.statusApproved": { th: "อนุมัติแล้ว", en: "Approved" },
+  "moveout.statusRejected": { th: "ไม่อนุมัติ", en: "Rejected" },
+  "moveout.listTitle": { th: "รายการคำร้องทั้งหมด", en: "All Requests" },
+  "moveout.totalItems": { th: "ทั้งหมด {n} รายการ", en: "{n} records total" },
+  "moveout.colMoveOutDate": { th: "วันที่ต้องการย้ายออก", en: "Move-out Date" },
+  "moveout.colSubmittedAt": { th: "วันที่ส่งคำร้อง", en: "Submitted At" },
+  "moveout.notFound": {
+    th: "ไม่พบคำร้องขอย้ายออก",
+    en: "No move-out requests found",
+  },
+  "moveout.detailTitle": {
+    th: "รายละเอียดคำร้องขอย้ายออก",
+    en: "Move-out Request Details",
+  },
+  "moveout.detailDesc": {
+    th: "ตรวจสอบข้อมูลและดำเนินการ",
+    en: "Review information and take action",
+  },
+  "moveout.reason": { th: "เหตุผล", en: "Reason" },
+  "moveout.adminNoteLabel": {
+    th: "หมายเหตุ (ถ้าปฏิเสธต้องกรอก)",
+    en: "Note (required if rejecting)",
+  },
+  "moveout.adminNotePlaceholder": {
+    th: "เหตุผลที่อนุมัติหรือไม่อนุมัติ...",
+    en: "Reason for approval or rejection...",
+  },
+  "moveout.adminNoteTitle": { th: "หมายเหตุแอดมิน", en: "Admin Note" },
+  "moveout.approve": { th: "อนุมัติ", en: "Approve" },
+  "moveout.reject": { th: "ไม่อนุมัติ", en: "Reject" },
+  "moveout.confirmApprove": {
+    th: "อนุมัติการย้ายออกของ",
+    en: "Approve move-out for",
+  },
+  "moveout.confirmApproveDetail": {
+    th: "สัญญาจะถูกยกเลิกและห้องจะว่างทันที",
+    en: "The contract will be terminated and the room will be available immediately.",
+  },
+  "moveout.approveSuccess": {
+    th: "อนุมัติการย้ายออกเรียบร้อย ห้องพร้อมให้เช่าแล้ว",
+    en: "Move-out approved. Room is now available for rent.",
+  },
+  "moveout.approveError": { th: "อนุมัติไม่สำเร็จ", en: "Failed to approve" },
+  "moveout.rejectNoteRequired": {
+    th: "กรุณากรอกเหตุผลที่ไม่อนุมัติ",
+    en: "Please enter a reason for rejection",
+  },
+  "moveout.rejectSuccess": {
+    th: "ปฏิเสธคำร้องเรียบร้อย",
+    en: "Request rejected successfully",
+  },
+  "moveout.rejectError": { th: "ดำเนินการไม่สำเร็จ", en: "Action failed" },
+  "moveout.loadError": { th: "โหลดข้อมูลไม่สำเร็จ", en: "Failed to load data" },
   "moveout.request": {
     th: "ส่งคำร้องขอย้ายออก",
     en: "Submit Move-out Request",
   },
   "moveout.moveOutDate": { th: "วันที่ต้องการย้ายออก", en: "Move-out Date" },
-  "moveout.reason": { th: "เหตุผล", en: "Reason" },
   "moveout.notice30": {
     th: "ต้องแจ้งล่วงหน้า 30 วัน",
     en: "Must give 30 days notice",
   },
   "moveout.fine": { th: "ค่าปรับ", en: "Fine" },
   "moveout.refund": { th: "ยอดคืนเงินประกัน", en: "Deposit Refund" },
-  "moveout.approve": { th: "อนุมัติ", en: "Approve" },
-  "moveout.reject": { th: "ไม่อนุมัติ", en: "Reject" },
+  "moveout.hasPending": {
+    th: "มีคำร้องรออยู่แล้ว",
+    en: "Already has pending request",
+  },
 
   // ── Tenant Dashboard ───────────────────────────────────────────────────────
   "tenant.welcome": { th: "สวัสดี", en: "Hello" },
@@ -292,8 +1068,6 @@ const translations: Record<string, { th: string; en: string }> = {
   },
   "tenant.overdueBill": { th: "บิลเกินกำหนดชำระ!", en: "Overdue bill!" },
   "tenant.payNow": { th: "ชำระเงิน", en: "Pay Now" },
-
-  // ── Tenant Bills ───────────────────────────────────────────────────────────
   "tenant.bills.title": { th: "บิลของฉัน", en: "My Bills" },
   "tenant.bills.subtitle": {
     th: "ดูรายละเอียดบิลค่าเช่าทั้งหมด",
@@ -301,8 +1075,6 @@ const translations: Record<string, { th: string; en: string }> = {
   },
   "tenant.bills.invoice": { th: "ใบแจ้งหนี้", en: "Invoice" },
   "tenant.bills.payBill": { th: "ชำระบิลนี้", en: "Pay This Bill" },
-
-  // ── Tenant Payment ─────────────────────────────────────────────────────────
   "tenant.payment.title": { th: "ชำระเงิน", en: "Payment" },
   "tenant.payment.subtitle": {
     th: "ชำระค่าห้อง ค่าน้ำ ค่าไฟ",
@@ -318,8 +1090,6 @@ const translations: Record<string, { th: string; en: string }> = {
     th: "หลังชำระแล้ว กรุณาอัปโหลดสลิปด้วยครับ",
     en: "After payment, please upload slip.",
   },
-
-  // ── Tenant Maintenance ─────────────────────────────────────────────────────
   "tenant.maintenance.title": { th: "ขอซ่อมแซม", en: "Maintenance Request" },
   "tenant.maintenance.subtitle": {
     th: "ส่งคำขอซ่อมแซมหรือปัญหาต่างๆ",
@@ -330,8 +1100,6 @@ const translations: Record<string, { th: string; en: string }> = {
     th: "ส่งคำขอสำเร็จ",
     en: "Request submitted",
   },
-
-  // ── Tenant Contract ────────────────────────────────────────────────────────
   "tenant.contract.title": { th: "สัญญาเช่า", en: "Rental Contract" },
   "tenant.contract.subtitle": {
     th: "ดูและจัดการสัญญาเช่าของคุณ",
@@ -342,8 +1110,6 @@ const translations: Record<string, { th: string; en: string }> = {
     th: "ยังไม่มีสัญญาเช่า",
     en: "No rental contract yet",
   },
-
-  // ── Tenant Move-out ────────────────────────────────────────────────────────
   "tenant.moveout.title": { th: "ขอย้ายออก", en: "Move-out Request" },
   "tenant.moveout.subtitle": {
     th: "แจ้งความประสงค์ย้ายออกจากหอพัก",
@@ -363,6 +1129,47 @@ const translations: Record<string, { th: string; en: string }> = {
   },
   "notifications.empty": { th: "ไม่มีการแจ้งเตือน", en: "No notifications" },
   "notifications.new": { th: "ใหม่", en: "New" },
+
+  // ── Empty states (tenant ใหม่) — ✅ เพิ่มใหม่ ──────────────────────────────
+  "empty.noBills": { th: "ยังไม่มีบิล", en: "No bills yet" },
+  "empty.noBillsDesc": {
+    th: "บิลจะปรากฏเมื่อแอดมินสร้างให้",
+    en: "Bills will appear once the admin creates them",
+  },
+  "empty.noPayments": {
+    th: "ยังไม่มีประวัติการชำระเงิน",
+    en: "No payment history yet",
+  },
+  "empty.noPaymentsDesc": {
+    th: "รายการจะปรากฏหลังจากชำระเงินแล้ว",
+    en: "Records will appear after you make a payment",
+  },
+  "empty.noMaintenance": {
+    th: "ยังไม่มีรายการแจ้งซ่อม",
+    en: "No maintenance requests yet",
+  },
+  "empty.noMaintenanceDesc": {
+    th: "กดปุ่ม 'ส่งคำขอใหม่' เพื่อแจ้งซ่อม",
+    en: "Tap 'New Request' to submit a repair request",
+  },
+  "empty.noMoveOut": {
+    th: "ยังไม่มีคำร้องย้ายออก",
+    en: "No move-out requests yet",
+  },
+  "empty.noMoveOutDesc": {
+    th: "กดปุ่มด้านบนเพื่อส่งคำร้อง",
+    en: "Tap the button above to submit a request",
+  },
+  "empty.noContract": { th: "ยังไม่มีสัญญาเช่า", en: "No rental contract yet" },
+  "empty.noContractDesc": {
+    th: "ติดต่อแอดมินเพื่อทำสัญญาเช่า",
+    en: "Contact admin to set up your rental contract",
+  },
+  "empty.noAnnouncements": { th: "ยังไม่มีประกาศ", en: "No announcements yet" },
+  "empty.noAnnouncementsDesc": {
+    th: "ประกาศจากหอพักจะแสดงที่นี่",
+    en: "Dormitory announcements will appear here",
+  },
 
   // ── Months ─────────────────────────────────────────────────────────────────
   "month.1": { th: "มกราคม", en: "January" },

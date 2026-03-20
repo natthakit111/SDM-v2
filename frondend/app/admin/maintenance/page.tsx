@@ -1,3 +1,5 @@
+//maintenance/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -42,6 +44,7 @@ import {
 import { Search, Wrench, Eye, CheckCircle, Loader2 } from "lucide-react";
 import { maintenanceAPI } from "@/lib/api/maintenance.api";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +80,7 @@ const formatDate = (d: string) =>
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function MaintenancePage() {
+  const { t } = useLanguage();
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -99,7 +103,7 @@ export default function MaintenancePage() {
       const res = await maintenanceAPI.getAll(params);
       setRequests(res.data ?? []);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("maintenance.loadError"));
     } finally {
       setLoading(false);
     }
@@ -131,11 +135,11 @@ export default function MaintenancePage() {
         admin_note: updateData.admin_note || undefined,
         assigned_to: updateData.assigned_to || undefined,
       });
-      toast.success("อัปเดตรายการแจ้งซ่อมเรียบร้อย");
+      toast.success(t("maintenance.updateSuccess"));
       setViewingRequest(null);
       fetchRequests();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "อัปเดตไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("maintenance.updateError"));
     } finally {
       setUpdating(false);
     }
@@ -154,10 +158,8 @@ export default function MaintenancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">จัดการแจ้งซ่อม</h1>
-        <p className="text-muted-foreground">
-          รับและจัดการรายการแจ้งซ่อมจากผู้เช่า
-        </p>
+        <h1 className="text-2xl font-bold">{t("maintenance.title")}</h1>
+        <p className="text-muted-foreground">{t("maintenance.subtitle")}</p>
       </div>
 
       {/* Filters */}
@@ -167,7 +169,7 @@ export default function MaintenancePage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาหมายเลขห้อง, หมวดหมู่ หรือชื่อผู้เช่า..."
+                placeholder={t("maintenance.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -175,14 +177,20 @@ export default function MaintenancePage() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="สถานะทั้งหมด" />
+                <SelectValue placeholder={t("maintenance.allStatuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-                <SelectItem value="pending">รอดำเนินการ</SelectItem>
-                <SelectItem value="in_progress">กำลังดำเนินการ</SelectItem>
-                <SelectItem value="resolved">เสร็จสิ้น</SelectItem>
-                <SelectItem value="cancelled">ยกเลิก</SelectItem>
+                <SelectItem value="all">
+                  {t("maintenance.allStatuses")}
+                </SelectItem>
+                <SelectItem value="pending">{t("status.pending")}</SelectItem>
+                <SelectItem value="in_progress">
+                  {t("status.in_progress")}
+                </SelectItem>
+                <SelectItem value="resolved">{t("status.resolved")}</SelectItem>
+                <SelectItem value="cancelled">
+                  {t("status.cancelled")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -198,9 +206,12 @@ export default function MaintenancePage() {
                 <Wrench className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <h3 className="font-semibold">รอดำเนินการ</h3>
+                <h3 className="font-semibold">{t("status.pending")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  มี {pendingCount} รายการที่รอดำเนินการ
+                  {t("maintenance.pendingAlert").replace(
+                    "{n}",
+                    String(pendingCount),
+                  )}
                 </p>
               </div>
             </div>
@@ -213,29 +224,34 @@ export default function MaintenancePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
-            รายการแจ้งซ่อม
+            {t("maintenance.listTitle")}
           </CardTitle>
           <CardDescription>
-            ทั้งหมด {filteredRequests.length} รายการ
+            {t("maintenance.totalItems").replace(
+              "{n}",
+              String(filteredRequests.length),
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
               <Loader2 className="h-5 w-5 animate-spin" />
-              กำลังโหลด...
+              {t("common.loading")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ห้อง</TableHead>
-                  <TableHead>ผู้แจ้ง</TableHead>
-                  <TableHead>หมวดหมู่</TableHead>
-                  <TableHead>ความสำคัญ</TableHead>
-                  <TableHead>แจ้งเมื่อ</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead>{t("meters.colRoom")}</TableHead>
+                  <TableHead>{t("maintenance.colReporter")}</TableHead>
+                  <TableHead>{t("maintenance.colCategory")}</TableHead>
+                  <TableHead>{t("maintenance.colPriority")}</TableHead>
+                  <TableHead>{t("maintenance.colReportedAt")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -277,7 +293,7 @@ export default function MaintenancePage() {
                       colSpan={7}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      ไม่พบรายการแจ้งซ่อมที่ตรงกับการค้นหา
+                      {t("maintenance.notFound")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -296,8 +312,8 @@ export default function MaintenancePage() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>รายละเอียดการแจ้งซ่อม</DialogTitle>
-            <DialogDescription>ดูรายละเอียดและอัปเดตสถานะ</DialogDescription>
+            <DialogTitle>{t("maintenance.detailTitle")}</DialogTitle>
+            <DialogDescription>{t("maintenance.detailDesc")}</DialogDescription>
           </DialogHeader>
 
           {viewingRequest && (
@@ -305,25 +321,33 @@ export default function MaintenancePage() {
               {/* Info */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">ห้อง</p>
+                  <p className="text-muted-foreground">{t("meters.colRoom")}</p>
                   <p className="font-medium">{viewingRequest.room_number}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">ผู้แจ้ง</p>
+                  <p className="text-muted-foreground">
+                    {t("maintenance.colReporter")}
+                  </p>
                   <p className="font-medium">{viewingRequest.tenant_name}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">หมวดหมู่</p>
+                  <p className="text-muted-foreground">
+                    {t("maintenance.colCategory")}
+                  </p>
                   <p className="font-medium">{viewingRequest.category}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">ความสำคัญ</p>
+                  <p className="text-muted-foreground">
+                    {t("maintenance.colPriority")}
+                  </p>
                   <PriorityBadge priority={viewingRequest.priority} />
                 </div>
               </div>
 
               <div className="text-sm">
-                <p className="text-muted-foreground mb-1">รายละเอียด</p>
+                <p className="text-muted-foreground mb-1">
+                  {t("maintenance.description")}
+                </p>
                 <p className="bg-muted/50 p-3 rounded-lg">
                   {viewingRequest.description}
                 </p>
@@ -333,7 +357,7 @@ export default function MaintenancePage() {
               <div className="pt-4 border-t space-y-4">
                 <FieldGroup>
                   <Field>
-                    <FieldLabel>สถานะ</FieldLabel>
+                    <FieldLabel>{t("common.status")}</FieldLabel>
                     <Select
                       value={updateData.status}
                       onValueChange={(v) =>
@@ -344,17 +368,23 @@ export default function MaintenancePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">รอดำเนินการ</SelectItem>
-                        <SelectItem value="in_progress">
-                          กำลังดำเนินการ
+                        <SelectItem value="pending">
+                          {t("status.pending")}
                         </SelectItem>
-                        <SelectItem value="resolved">เสร็จสิ้น</SelectItem>
-                        <SelectItem value="cancelled">ยกเลิก</SelectItem>
+                        <SelectItem value="in_progress">
+                          {t("status.in_progress")}
+                        </SelectItem>
+                        <SelectItem value="resolved">
+                          {t("status.resolved")}
+                        </SelectItem>
+                        <SelectItem value="cancelled">
+                          {t("status.cancelled")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel>มอบหมายให้</FieldLabel>
+                    <FieldLabel>{t("maintenance.assignedTo")}</FieldLabel>
                     <Input
                       value={updateData.assigned_to}
                       onChange={(e) =>
@@ -363,11 +393,11 @@ export default function MaintenancePage() {
                           assigned_to: e.target.value,
                         }))
                       }
-                      placeholder="ชื่อช่างหรือผู้รับผิดชอบ"
+                      placeholder={t("maintenance.assignedPlaceholder")}
                     />
                   </Field>
                   <Field>
-                    <FieldLabel>หมายเหตุ</FieldLabel>
+                    <FieldLabel>{t("common.note")}</FieldLabel>
                     <Textarea
                       value={updateData.admin_note}
                       onChange={(e) =>
@@ -376,7 +406,7 @@ export default function MaintenancePage() {
                           admin_note: e.target.value,
                         }))
                       }
-                      placeholder="บันทึกเพิ่มเติม..."
+                      placeholder={t("maintenance.notePlaceholder")}
                       rows={3}
                     />
                   </Field>
@@ -389,7 +419,7 @@ export default function MaintenancePage() {
                   onClick={() => setViewingRequest(null)}
                   disabled={updating}
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </Button>
                 <Button onClick={handleUpdate} disabled={updating}>
                   {updating ? (
@@ -397,7 +427,7 @@ export default function MaintenancePage() {
                   ) : (
                     <CheckCircle className="mr-2 h-4 w-4" />
                   )}
-                  บันทึก
+                  {t("common.save")}
                 </Button>
               </DialogFooter>
             </div>

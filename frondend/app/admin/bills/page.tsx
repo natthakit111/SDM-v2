@@ -1,3 +1,5 @@
+//bills/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -51,8 +53,8 @@ import {
 } from "lucide-react";
 import { billAPI } from "@/lib/api/bill.api";
 import { roomAPI } from "@/lib/api/room.api";
-import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
+import { toast } from "sonner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,7 +85,6 @@ interface Bill {
   due_date: string;
   status: "pending" | "paid" | "overdue" | "cancelled";
   qr_payload: string | null;
-  // จาก getById
   meter_readings?: MeterReading[];
 }
 
@@ -109,35 +110,12 @@ const emptyForm: FormData = {
   due_date: "",
 };
 
-const MONTHS = [
-  "",
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
-];
-
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat("th-TH", {
     style: "currency",
     currency: "THB",
     maximumFractionDigits: 0,
   }).format(n);
-
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 
 const imgUrl = (path: string | null) => {
   if (!path) return null;
@@ -148,7 +126,7 @@ const imgUrl = (path: string | null) => {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function BillsPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [bills, setBills] = useState<Bill[]>([]);
   const [occupiedRooms, setOccupiedRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +138,13 @@ export default function BillsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>(emptyForm);
 
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
   // ── Fetch bills ───────────────────────────────────────────────────────────
   const fetchBills = useCallback(async () => {
     try {
@@ -169,7 +154,7 @@ export default function BillsPage() {
       const res = await billAPI.getAll(params);
       setBills(res.data ?? []);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลบิลไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("common.noData"));
     } finally {
       setLoading(false);
     }
@@ -179,9 +164,7 @@ export default function BillsPage() {
     try {
       const res = await roomAPI.getAll({ status: "occupied" });
       setOccupiedRooms(res.data ?? []);
-    } catch {
-      /* ไม่ critical */
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -191,15 +174,13 @@ export default function BillsPage() {
     fetchOccupiedRooms();
   }, []);
 
-  // ── View bill — โหลด meter_readings จาก getById (flat fields) ──────────────
+  // ── View bill ─────────────────────────────────────────────────────────────
   const handleViewBill = async (bill: Bill) => {
     setViewingBill(bill);
     setDetailLoading(true);
     try {
       const res = await billAPI.getById(bill.bill_id);
       const detail = res?.data ?? res;
-
-      // แปลง flat fields → meter_readings array
       const meter_readings: MeterReading[] = [];
       if (detail.elec_current != null) {
         meter_readings.push({
@@ -223,7 +204,6 @@ export default function BillsPage() {
           image_path: detail.water_image ?? null,
         });
       }
-
       setViewingBill({ ...bill, ...detail, meter_readings });
     } catch {
       // ใช้ข้อมูลเดิมถ้าโหลดไม่ได้
@@ -253,11 +233,11 @@ export default function BillsPage() {
         other_amount: parseFloat(formData.other_amount) || 0,
         due_date: formData.due_date || undefined,
       });
-      toast.success("สร้างบิลเรียบร้อย");
+      toast.success(t("bills.generate"));
       resetForm();
       fetchBills();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "สร้างบิลไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("common.noData"));
     } finally {
       setSubmitting(false);
     }
@@ -267,16 +247,16 @@ export default function BillsPage() {
   const handleCancel = async (bill: Bill) => {
     if (
       !confirm(
-        `ต้องการยกเลิกบิลห้อง ${bill.room_number} เดือน ${MONTHS[bill.bill_month]} ${bill.bill_year} หรือไม่?`,
+        `${t("bills.cancelBill")} ${t("rooms.roomNumber")} ${bill.room_number} ${t(`month.${bill.bill_month}`)} ${bill.bill_year}?`,
       )
     )
       return;
     try {
       await billAPI.cancel(bill.bill_id);
-      toast.success("ยกเลิกบิลเรียบร้อย");
+      toast.success(t("bills.cancelBill"));
       fetchBills();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "ยกเลิกบิลไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("common.noData"));
     }
   };
 
@@ -286,7 +266,6 @@ export default function BillsPage() {
   };
 
   const currentYear = new Date().getFullYear();
-
   const elecReading = viewingBill?.meter_readings?.find(
     (r) => r.meter_type === "electric",
   );
@@ -300,8 +279,8 @@ export default function BillsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">จัดการบิล</h1>
-          <p className="text-muted-foreground">สร้างและจัดการบิลค่าเช่า</p>
+          <h1 className="text-2xl font-bold">{t("bills.title")}</h1>
+          <p className="text-muted-foreground">{t("bills.subtitle")}</p>
         </div>
 
         <Dialog
@@ -314,20 +293,20 @@ export default function BillsPage() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              สร้างบิล
+              {t("bills.generate")}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>สร้างบิลใหม่</DialogTitle>
-              <DialogDescription>
-                เลือกห้องและเดือนเพื่อสร้างบิล (ต้องบันทึกมิเตอร์ก่อน)
-              </DialogDescription>
+              <DialogTitle>{t("bills.generate")}</DialogTitle>
+              <DialogDescription>{t("bills.subtitle")}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>ห้อง (มีผู้เช่า)</FieldLabel>
+                  <FieldLabel>
+                    {t("rooms.roomNumber")} ({t("status.occupied")})
+                  </FieldLabel>
                   <Select
                     value={formData.room_id}
                     onValueChange={(v) =>
@@ -335,12 +314,12 @@ export default function BillsPage() {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="เลือกห้อง" />
+                      <SelectValue placeholder={t("rooms.searchPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
                       {occupiedRooms.map((r) => (
                         <SelectItem key={r.room_id} value={String(r.room_id)}>
-                          ห้อง {r.room_number}
+                          {t("rooms.roomNumber")} {r.room_number}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -348,7 +327,7 @@ export default function BillsPage() {
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel>เดือน</FieldLabel>
+                    <FieldLabel>{t("bills.month")}</FieldLabel>
                     <Select
                       value={formData.month}
                       onValueChange={(v) =>
@@ -359,16 +338,18 @@ export default function BillsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {MONTHS.slice(1).map((m, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            {m}
-                          </SelectItem>
-                        ))}
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                          (m) => (
+                            <SelectItem key={m} value={String(m)}>
+                              {t(`month.${m}`)}
+                            </SelectItem>
+                          ),
+                        )}
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field>
-                    <FieldLabel>ปี</FieldLabel>
+                    <FieldLabel>{t("bills.year")}</FieldLabel>
                     <Select
                       value={formData.year}
                       onValueChange={(v) =>
@@ -390,7 +371,7 @@ export default function BillsPage() {
                 </div>
                 <Field>
                   <FieldLabel htmlFor="other_amount">
-                    ค่าใช้จ่ายอื่นๆ (บาท)
+                    {t("bills.otherAmount")}
                   </FieldLabel>
                   <Input
                     id="other_amount"
@@ -408,7 +389,7 @@ export default function BillsPage() {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="due_date">
-                    วันกำหนดชำระ (ไม่บังคับ)
+                    {t("bills.dueDate")} ({t("common.note")})
                   </FieldLabel>
                   <Input
                     id="due_date"
@@ -427,7 +408,7 @@ export default function BillsPage() {
                   onClick={resetForm}
                   disabled={submitting}
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -436,7 +417,7 @@ export default function BillsPage() {
                   {submitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  สร้างบิล
+                  {t("bills.generate")}
                 </Button>
               </DialogFooter>
             </form>
@@ -451,7 +432,7 @@ export default function BillsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาหมายเลขห้อง หรือชื่อผู้เช่า..."
+                placeholder={t("bills.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -459,14 +440,16 @@ export default function BillsPage() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="สถานะทั้งหมด" />
+                <SelectValue placeholder={t("common.all")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-                <SelectItem value="pending">รอชำระ</SelectItem>
-                <SelectItem value="paid">ชำระแล้ว</SelectItem>
-                <SelectItem value="overdue">เกินกำหนด</SelectItem>
-                <SelectItem value="cancelled">ยกเลิก</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="pending">{t("status.pending")}</SelectItem>
+                <SelectItem value="paid">{t("status.paid")}</SelectItem>
+                <SelectItem value="overdue">{t("status.overdue")}</SelectItem>
+                <SelectItem value="cancelled">
+                  {t("status.cancelled")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -478,29 +461,35 @@ export default function BillsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
-            รายการบิล
+            {t("bills.list")}
           </CardTitle>
           <CardDescription>
-            ทั้งหมด {filteredBills.length} รายการ
+            {t("common.all")} {filteredBills.length} {t("bills.list")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
               <Loader2 className="h-5 w-5 animate-spin" />
-              กำลังโหลด...
+              {t("common.loading")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ห้อง</TableHead>
-                  <TableHead>ผู้เช่า</TableHead>
-                  <TableHead>เดือน/ปี</TableHead>
-                  <TableHead className="text-right">ยอดรวม</TableHead>
-                  <TableHead>กำหนดชำระ</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead>{t("rooms.roomNumber")}</TableHead>
+                  <TableHead>{t("tenants.title")}</TableHead>
+                  <TableHead>
+                    {t("bills.month")}/{t("bills.year")}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t("bills.totalAmount")}
+                  </TableHead>
+                  <TableHead>{t("bills.dueDate")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -511,7 +500,7 @@ export default function BillsPage() {
                     </TableCell>
                     <TableCell>{bill.tenant_name}</TableCell>
                     <TableCell>
-                      {MONTHS[bill.bill_month]} {bill.bill_year}
+                      {t(`month.${bill.bill_month}`)} {bill.bill_year}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(bill.total_amount)}
@@ -550,7 +539,7 @@ export default function BillsPage() {
                       colSpan={7}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      ไม่พบบิลที่ตรงกับการค้นหา
+                      {t("common.noData")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -569,41 +558,46 @@ export default function BillsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              รายละเอียดบิล
+              {t("bills.detail")}
             </DialogTitle>
           </DialogHeader>
           {viewingBill && (
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-4 border-b">
                 <div>
-                  <p className="font-medium">ห้อง {viewingBill.room_number}</p>
+                  <p className="font-medium">
+                    {t("rooms.roomNumber")} {viewingBill.room_number}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {viewingBill.tenant_name}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">
-                    {MONTHS[viewingBill.bill_month]} {viewingBill.bill_year}
+                    {t(`month.${viewingBill.bill_month}`)}{" "}
+                    {viewingBill.bill_year}
                   </p>
                   <BillStatusBadge status={viewingBill.status} />
                 </div>
               </div>
 
-              {/* รายละเอียดค่าใช้จ่าย */}
+              {/* Breakdown */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">ค่าเช่า</span>
+                  <span className="text-muted-foreground">
+                    {t("bills.rentAmount")}
+                  </span>
                   <span>{formatCurrency(viewingBill.rent_amount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Zap className="h-3 w-3 text-yellow-500" />
-                    ค่าไฟฟ้า
+                    {t("bills.electricAmount")}
                     {elecReading && (
                       <span className="text-xs ml-1">
                         ({elecReading.previous_unit} →{" "}
                         {elecReading.current_unit} = {elecReading.units_used}{" "}
-                        หน่วย × ฿{elecReading.rate_per_unit})
+                        {t("meters.used")} × ฿{elecReading.rate_per_unit})
                       </span>
                     )}
                   </span>
@@ -612,12 +606,12 @@ export default function BillsPage() {
                 <div className="flex justify-between">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Droplets className="h-3 w-3 text-blue-500" />
-                    ค่าน้ำ
+                    {t("bills.waterAmount")}
                     {waterReading && (
                       <span className="text-xs ml-1">
                         ({waterReading.previous_unit} →{" "}
                         {waterReading.current_unit} = {waterReading.units_used}{" "}
-                        หน่วย × ฿{waterReading.rate_per_unit})
+                        {t("meters.used")} × ฿{waterReading.rate_per_unit})
                       </span>
                     )}
                   </span>
@@ -625,22 +619,26 @@ export default function BillsPage() {
                 </div>
                 {viewingBill.other_amount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">ค่าอื่นๆ</span>
+                    <span className="text-muted-foreground">
+                      {t("bills.otherAmount")}
+                    </span>
                     <span>{formatCurrency(viewingBill.other_amount)}</span>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between pt-4 border-t font-bold text-lg">
-                <span>รวมทั้งหมด</span>
+                <span>{t("common.total")}</span>
                 <span>{formatCurrency(viewingBill.total_amount)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">กำหนดชำระภายใน</span>
+                <span className="text-muted-foreground">
+                  {t("bills.dueDate")}
+                </span>
                 <span>{formatDate(viewingBill.due_date)}</span>
               </div>
 
-              {/* รูปมิเตอร์ */}
+              {/* Meter images */}
               {detailLoading ? (
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -649,13 +647,13 @@ export default function BillsPage() {
                 <div className="pt-4 border-t space-y-3">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <Camera className="h-4 w-4" />
-                    รูปหลักฐานมิเตอร์
+                    {t("meters.image")}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Zap className="h-3 w-3 text-yellow-500" />
-                        มิเตอร์ไฟฟ้า
+                        {t("meters.electric")}
                       </p>
                       {elecReading?.image_path ? (
                         <a
@@ -665,7 +663,7 @@ export default function BillsPage() {
                         >
                           <img
                             src={imgUrl(elecReading.image_path) ?? ""}
-                            alt="มิเตอร์ไฟ"
+                            alt={t("meters.electric")}
                             className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                           />
                         </a>
@@ -673,7 +671,7 @@ export default function BillsPage() {
                         <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
                           <div className="text-center text-muted-foreground">
                             <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                            <p className="text-xs">ไม่มีรูป</p>
+                            <p className="text-xs">{t("common.noData")}</p>
                           </div>
                         </div>
                       )}
@@ -681,7 +679,7 @@ export default function BillsPage() {
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Droplets className="h-3 w-3 text-blue-500" />
-                        มิเตอร์น้ำ
+                        {t("meters.water")}
                       </p>
                       {waterReading?.image_path ? (
                         <a
@@ -691,7 +689,7 @@ export default function BillsPage() {
                         >
                           <img
                             src={imgUrl(waterReading.image_path) ?? ""}
-                            alt="มิเตอร์น้ำ"
+                            alt={t("meters.water")}
                             className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                           />
                         </a>
@@ -699,7 +697,7 @@ export default function BillsPage() {
                         <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
                           <div className="text-center text-muted-foreground">
                             <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                            <p className="text-xs">ไม่มีรูป</p>
+                            <p className="text-xs">{t("common.noData")}</p>
                           </div>
                         </div>
                       )}

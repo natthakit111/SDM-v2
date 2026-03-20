@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,11 +17,29 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bell, LogOut, User, Settings } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { paymentAPI } from "@/lib/api/payment.api";
+import { maintenanceAPI } from "@/lib/api/maintenance.api";
 
 export function AdminNavbar() {
   const { user, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const router = useRouter();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    Promise.allSettled([
+      paymentAPI.getAll({ status: "pending_verify" }),
+      maintenanceAPI.getAll({ status: "pending" }),
+    ]).then(([payRes, maintRes]) => {
+      const p =
+        payRes.status === "fulfilled" ? (payRes.value.data ?? []).length : 0;
+      const m =
+        maintRes.status === "fulfilled"
+          ? (maintRes.value.data ?? []).length
+          : 0;
+      setUnreadCount(p + m);
+    });
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -30,7 +49,7 @@ export function AdminNavbar() {
   const initials =
     user?.name
       ?.split(" ")
-      .map((n) => n[0])
+      .map((n: string) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2) || "AD";
@@ -42,6 +61,7 @@ export function AdminNavbar() {
       <div className="flex-1">
         <h2 className="text-sm font-medium text-muted-foreground">DormFlow</h2>
       </div>
+
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -50,9 +70,11 @@ export function AdminNavbar() {
           onClick={() => router.push("/admin/notifications")}
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-            3
-          </span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </Button>
 
         <DropdownMenu>
@@ -78,10 +100,13 @@ export function AdminNavbar() {
             <DropdownMenuLabel>{t("common.myAccount")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem onClick={() => router.push("/admin/settings")}>
+            {/* ✅ แก้: Profile → /admin/profile */}
+            <DropdownMenuItem onClick={() => router.push("/admin/profile")}>
               <User className="mr-2 h-4 w-4" />
               {t("common.profile")}
             </DropdownMenuItem>
+
+            {/* ✅ แก้: Settings → /admin/settings */}
             <DropdownMenuItem onClick={() => router.push("/admin/settings")}>
               <Settings className="mr-2 h-4 w-4" />
               {t("common.settings")}

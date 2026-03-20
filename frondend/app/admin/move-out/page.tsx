@@ -1,3 +1,5 @@
+//move-out/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -73,19 +75,19 @@ const fmtDate = (d: string) =>
 
 const statusConfig = {
   pending: {
-    label: "รอพิจารณา",
+    labelKey: "moveout.statusPending",
     icon: Clock,
     color: "text-yellow-500",
     bg: "bg-yellow-500/10",
   },
   approved: {
-    label: "อนุมัติแล้ว",
+    labelKey: "moveout.statusApproved",
     icon: CheckCircle,
     color: "text-green-500",
     bg: "bg-green-500/10",
   },
   rejected: {
-    label: "ไม่อนุมัติ",
+    labelKey: "moveout.statusRejected",
     icon: XCircle,
     color: "text-destructive",
     bg: "bg-destructive/10",
@@ -113,7 +115,7 @@ export default function AdminMoveOutPage() {
       const res = await moveOutAPI.getAll();
       setRequests(res.data ?? []);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("moveout.loadError"));
     } finally {
       setLoading(false);
     }
@@ -138,19 +140,19 @@ export default function AdminMoveOutPage() {
     if (!viewingRequest) return;
     if (
       !confirm(
-        `อนุมัติการย้ายออกของ ${viewingRequest.first_name} ${viewingRequest.last_name}?\nสัญญาจะถูกยกเลิกและห้องจะว่างทันที`,
+        `${t("moveout.confirmApprove")} ${viewingRequest.first_name} ${viewingRequest.last_name}?\n${t("moveout.confirmApproveDetail")}`,
       )
     )
       return;
     setProcessing(true);
     try {
       await moveOutAPI.approve(viewingRequest.request_id, adminNote);
-      toast.success("อนุมัติการย้ายออกเรียบร้อย ห้องพร้อมให้เช่าแล้ว");
+      toast.success(t("moveout.approveSuccess"));
       setViewingRequest(null);
       setAdminNote("");
       fetchRequests();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "อนุมัติไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("moveout.approveError"));
     } finally {
       setProcessing(false);
     }
@@ -160,18 +162,18 @@ export default function AdminMoveOutPage() {
   const handleReject = async () => {
     if (!viewingRequest) return;
     if (!adminNote.trim()) {
-      toast.error("กรุณากรอกเหตุผลที่ไม่อนุมัติ");
+      toast.error(t("moveout.rejectNoteRequired"));
       return;
     }
     setProcessing(true);
     try {
       await moveOutAPI.reject(viewingRequest.request_id, adminNote);
-      toast.success("ปฏิเสธคำร้องเรียบร้อย");
+      toast.success(t("moveout.rejectSuccess"));
       setViewingRequest(null);
       setAdminNote("");
       fetchRequests();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "ดำเนินการไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("moveout.rejectError"));
     } finally {
       setProcessing(false);
     }
@@ -189,36 +191,34 @@ export default function AdminMoveOutPage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <LogOut className="h-6 w-6" />
-          คำร้องขอย้ายออก
+          {t("moveout.title")}
         </h1>
-        <p className="text-muted-foreground">
-          ตรวจสอบและอนุมัติคำร้องขอย้ายออกจากผู้เช่า
-        </p>
+        <p className="text-muted-foreground">{t("moveout.subtitle")}</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
           {
-            label: "รอพิจารณา",
+            labelKey: "moveout.statusPending",
             value: requests.filter((r) => r.status === "pending").length,
             color: "text-yellow-500",
           },
           {
-            label: "อนุมัติแล้ว",
+            labelKey: "moveout.statusApproved",
             value: requests.filter((r) => r.status === "approved").length,
             color: "text-green-500",
           },
           {
-            label: "ไม่อนุมัติ",
+            labelKey: "moveout.statusRejected",
             value: requests.filter((r) => r.status === "rejected").length,
             color: "text-destructive",
           },
-        ].map(({ label, value, color }) => (
-          <Card key={label}>
+        ].map(({ labelKey, value, color }) => (
+          <Card key={labelKey}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {label}
+                {t(labelKey)}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -235,7 +235,7 @@ export default function AdminMoveOutPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาชื่อผู้เช่า หรือหมายเลขห้อง..."
+                placeholder={t("moveout.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -243,13 +243,19 @@ export default function AdminMoveOutPage() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="สถานะทั้งหมด" />
+                <SelectValue placeholder={t("moveout.allStatuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-                <SelectItem value="pending">รอพิจารณา</SelectItem>
-                <SelectItem value="approved">อนุมัติแล้ว</SelectItem>
-                <SelectItem value="rejected">ไม่อนุมัติ</SelectItem>
+                <SelectItem value="all">{t("moveout.allStatuses")}</SelectItem>
+                <SelectItem value="pending">
+                  {t("moveout.statusPending")}
+                </SelectItem>
+                <SelectItem value="approved">
+                  {t("moveout.statusApproved")}
+                </SelectItem>
+                <SelectItem value="rejected">
+                  {t("moveout.statusRejected")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -259,24 +265,28 @@ export default function AdminMoveOutPage() {
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>รายการคำร้องทั้งหมด</CardTitle>
-          <CardDescription>ทั้งหมด {filtered.length} รายการ</CardDescription>
+          <CardTitle>{t("moveout.listTitle")}</CardTitle>
+          <CardDescription>
+            {t("moveout.totalItems").replace("{n}", String(filtered.length))}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+              <Loader2 className="h-5 w-5 animate-spin" /> {t("common.loading")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ผู้เช่า</TableHead>
-                  <TableHead>ห้อง</TableHead>
-                  <TableHead>วันที่ต้องการย้ายออก</TableHead>
-                  <TableHead>วันที่ส่งคำร้อง</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead>{t("common.tenant")}</TableHead>
+                  <TableHead>{t("contracts.room")}</TableHead>
+                  <TableHead>{t("moveout.colMoveOutDate")}</TableHead>
+                  <TableHead>{t("moveout.colSubmittedAt")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -298,7 +308,7 @@ export default function AdminMoveOutPage() {
                           className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full ${s.bg} ${s.color}`}
                         >
                           <Icon className="h-3 w-3" />
-                          {s.label}
+                          {t(s.labelKey)}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -319,7 +329,7 @@ export default function AdminMoveOutPage() {
                       colSpan={6}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      ไม่พบคำร้องขอย้ายออก
+                      {t("moveout.notFound")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -341,8 +351,8 @@ export default function AdminMoveOutPage() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>รายละเอียดคำร้องขอย้ายออก</DialogTitle>
-            <DialogDescription>ตรวจสอบข้อมูลและดำเนินการ</DialogDescription>
+            <DialogTitle>{t("moveout.detailTitle")}</DialogTitle>
+            <DialogDescription>{t("moveout.detailDesc")}</DialogDescription>
           </DialogHeader>
 
           {viewingRequest && (
@@ -350,23 +360,27 @@ export default function AdminMoveOutPage() {
               {/* Info */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">ผู้เช่า</p>
+                  <p className="text-muted-foreground">{t("common.tenant")}</p>
                   <p className="font-medium">
                     {viewingRequest.first_name} {viewingRequest.last_name}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">ห้อง</p>
+                  <p className="text-muted-foreground">{t("contracts.room")}</p>
                   <p className="font-medium">{viewingRequest.room_number}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">วันที่ส่งคำร้อง</p>
+                  <p className="text-muted-foreground">
+                    {t("moveout.colSubmittedAt")}
+                  </p>
                   <p className="font-medium">
                     {fmtDate(viewingRequest.created_at)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">วันที่ต้องการย้ายออก</p>
+                  <p className="text-muted-foreground">
+                    {t("moveout.colMoveOutDate")}
+                  </p>
                   <p className="font-medium text-primary">
                     {fmtDate(viewingRequest.move_out_date)}
                   </p>
@@ -374,7 +388,9 @@ export default function AdminMoveOutPage() {
               </div>
 
               <div className="text-sm">
-                <p className="text-muted-foreground mb-1">เหตุผล</p>
+                <p className="text-muted-foreground mb-1">
+                  {t("moveout.reason")}
+                </p>
                 <p className="bg-muted/50 p-3 rounded-lg">
                   {viewingRequest.reason}
                 </p>
@@ -385,13 +401,13 @@ export default function AdminMoveOutPage() {
                 <FieldGroup>
                   <Field>
                     <FieldLabel htmlFor="adminNote">
-                      หมายเหตุ (ถ้าปฏิเสธต้องกรอก)
+                      {t("moveout.adminNoteLabel")}
                     </FieldLabel>
                     <Textarea
                       id="adminNote"
                       value={adminNote}
                       onChange={(e) => setAdminNote(e.target.value)}
-                      placeholder="เหตุผลที่อนุมัติหรือไม่อนุมัติ..."
+                      placeholder={t("moveout.adminNotePlaceholder")}
                       rows={3}
                     />
                   </Field>
@@ -399,7 +415,9 @@ export default function AdminMoveOutPage() {
               ) : (
                 viewingRequest.admin_note && (
                   <div className="text-sm">
-                    <p className="text-muted-foreground mb-1">หมายเหตุแอดมิน</p>
+                    <p className="text-muted-foreground mb-1">
+                      {t("moveout.adminNoteTitle")}
+                    </p>
                     <p className="bg-muted/50 p-3 rounded-lg">
                       {viewingRequest.admin_note}
                     </p>
@@ -418,7 +436,7 @@ export default function AdminMoveOutPage() {
                     }}
                     disabled={processing}
                   >
-                    ปิด
+                    {t("common.close")}
                   </Button>
                   <Button
                     variant="destructive"
@@ -429,14 +447,14 @@ export default function AdminMoveOutPage() {
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     <XCircle className="mr-2 h-4 w-4" />
-                    ไม่อนุมัติ
+                    {t("moveout.reject")}
                   </Button>
                   <Button onClick={handleApprove} disabled={processing}>
                     {processing && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    อนุมัติ
+                    {t("moveout.approve")}
                   </Button>
                 </DialogFooter>
               )}
@@ -447,7 +465,7 @@ export default function AdminMoveOutPage() {
                     variant="outline"
                     onClick={() => setViewingRequest(null)}
                   >
-                    ปิด
+                    {t("common.close")}
                   </Button>
                 </DialogFooter>
               )}

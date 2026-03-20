@@ -1,3 +1,5 @@
+//tenant/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -69,22 +71,6 @@ interface Contract {
   status: string;
 }
 
-const MONTHS = [
-  "",
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
-];
-
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat("th-TH", {
     style: "currency",
@@ -92,8 +78,8 @@ const formatCurrency = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString("th-TH", {
+const formatDate = (d: string, lang: string) =>
+  new Date(d).toLocaleDateString(lang === "th" ? "th-TH" : "en-GB", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -102,7 +88,7 @@ const formatDate = (d: string) =>
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function TenantDashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
 
   const [bills, setBills] = useState<Bill[]>([]);
@@ -142,27 +128,25 @@ export default function TenantDashboard() {
   const pendingBill = bills.find(
     (b) => b.status === "pending" || b.status === "overdue",
   );
-  const activeMaintenance = maintenance.filter(
-    (m) => m.status !== "resolved" && m.status !== "cancelled",
-  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 gap-2 text-muted-foreground">
         <Loader2 className="h-6 w-6 animate-spin" />
-        กำลังโหลด...
+        {t("common.loading")}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">
-          สวัสดี, {user?.username || "ผู้เช่า"}
+          {t("tenant.welcome")}, {user?.username || t("common.tenant")}
         </h1>
-        <p className="text-muted-foreground">ยินดีต้อนรับสู่ระบบจัดการหอพัก</p>
+        <p className="text-muted-foreground">{t("rooms.subtitle")}</p>
       </div>
 
       {/* Room Info Card */}
@@ -175,15 +159,20 @@ export default function TenantDashboard() {
                   <DoorOpen className="h-8 w-8 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">ห้องพักของคุณ</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("tenant.myRoom")}
+                  </p>
                   <p className="text-3xl font-bold">{contract.room_number}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    สัญญาถึง {formatDate(contract.end_date)}
+                    {t("contracts.endDate")}{" "}
+                    {formatDate(contract.end_date, language)}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">ค่าเช่ารายเดือน</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("tenant.rentPerMonth")}
+                </p>
                 <p className="text-2xl font-bold text-primary">
                   {formatCurrency(Number(contract.rent_amount))}
                 </p>
@@ -206,23 +195,34 @@ export default function TenantDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div
-                  className={`p-2 rounded-lg ${pendingBill.status === "overdue" ? "bg-destructive/20" : "bg-yellow-500/20"}`}
+                  className={`p-2 rounded-lg ${
+                    pendingBill.status === "overdue"
+                      ? "bg-destructive/20"
+                      : "bg-yellow-500/20"
+                  }`}
                 >
                   <AlertTriangle
-                    className={`h-5 w-5 ${pendingBill.status === "overdue" ? "text-destructive" : "text-yellow-600"}`}
+                    className={`h-5 w-5 ${
+                      pendingBill.status === "overdue"
+                        ? "text-destructive"
+                        : "text-yellow-600"
+                    }`}
                   />
                 </div>
                 <div>
                   <h3
-                    className={`font-semibold ${pendingBill.status === "overdue" ? "text-destructive" : ""}`}
+                    className={`font-semibold ${
+                      pendingBill.status === "overdue" ? "text-destructive" : ""
+                    }`}
                   >
                     {pendingBill.status === "overdue"
-                      ? "บิลเกินกำหนดชำระ!"
-                      : "คุณมีบิลที่รอชำระ"}
+                      ? t("tenant.overdueBill")
+                      : t("tenant.pendingBill")}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {MONTHS[pendingBill.bill_month]} {pendingBill.bill_year} •
-                    ยอด {formatCurrency(pendingBill.total_amount)}
+                    {t(`month.${pendingBill.bill_month}`)}{" "}
+                    {pendingBill.bill_year} • {t("bills.totalAmount")}{" "}
+                    {formatCurrency(pendingBill.total_amount)}
                   </p>
                 </div>
               </div>
@@ -232,7 +232,7 @@ export default function TenantDashboard() {
                     pendingBill.status === "overdue" ? "destructive" : "default"
                   }
                 >
-                  ชำระเงิน
+                  {t("tenant.payNow")}
                 </Button>
               </Link>
             </div>
@@ -243,10 +243,26 @@ export default function TenantDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { href: "/tenant/bills", icon: Receipt, label: "ดูบิล" },
-          { href: "/tenant/payment", icon: CreditCard, label: "ชำระเงิน" },
-          { href: "/tenant/maintenance", icon: Wrench, label: "แจ้งซ่อม" },
-          { href: "/tenant/contract", icon: Calendar, label: "สัญญาเช่า" },
+          {
+            href: "/tenant/bills",
+            icon: Receipt,
+            label: t("tenant.bills.title"),
+          },
+          {
+            href: "/tenant/payment",
+            icon: CreditCard,
+            label: t("tenant.payment.title"),
+          },
+          {
+            href: "/tenant/maintenance",
+            icon: Wrench,
+            label: t("menu.maintenance"),
+          },
+          {
+            href: "/tenant/contract",
+            icon: Calendar,
+            label: t("tenant.contract.title"),
+          },
         ].map(({ href, icon: Icon, label }) => (
           <Link key={href} href={href}>
             <Card className="hover:border-primary/50 transition-colors cursor-pointer">
@@ -265,12 +281,12 @@ export default function TenantDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">บิลล่าสุด</CardTitle>
-              <CardDescription>รายการบิลของคุณ</CardDescription>
+              <CardTitle className="text-lg">{t("bills.list")}</CardTitle>
+              <CardDescription>{t("bills.subtitle")}</CardDescription>
             </div>
             <Link href="/tenant/bills">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
+                {t("common.viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
@@ -283,10 +299,10 @@ export default function TenantDashboard() {
                 >
                   <div>
                     <p className="font-medium">
-                      {MONTHS[bill.bill_month]} {bill.bill_year}
+                      {t(`month.${bill.bill_month}`)} {bill.bill_year}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      กำหนดชำระ {formatDate(bill.due_date)}
+                      {t("bills.dueDate")} {formatDate(bill.due_date, language)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -299,7 +315,7 @@ export default function TenantDashboard() {
               ))}
               {bills.length === 0 && (
                 <p className="text-center text-muted-foreground py-4">
-                  ไม่มีบิล
+                  {t("common.noData")}
                 </p>
               )}
             </div>
@@ -310,12 +326,12 @@ export default function TenantDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">รายการแจ้งซ่อม</CardTitle>
-              <CardDescription>สถานะการแจ้งซ่อมของคุณ</CardDescription>
+              <CardTitle className="text-lg">{t("maintenance.list")}</CardTitle>
+              <CardDescription>{t("maintenance.subtitle")}</CardDescription>
             </div>
             <Link href="/tenant/maintenance">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
+                {t("common.viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
@@ -329,7 +345,8 @@ export default function TenantDashboard() {
                   <div>
                     <p className="font-medium">{req.category}</p>
                     <p className="text-sm text-muted-foreground">
-                      แจ้งเมื่อ {formatDate(req.created_at)}
+                      {t("common.created")}{" "}
+                      {formatDate(req.created_at, language)}
                     </p>
                   </div>
                   <MaintenanceStatusBadge status={req.status} />
@@ -337,7 +354,7 @@ export default function TenantDashboard() {
               ))}
               {maintenance.length === 0 && (
                 <p className="text-center text-muted-foreground py-4">
-                  ไม่มีรายการแจ้งซ่อม
+                  {t("common.noData")}
                 </p>
               )}
             </div>
@@ -351,7 +368,7 @@ export default function TenantDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Bell className="h-5 w-5" />
-              ประกาศล่าสุด
+              {t("announcements.title")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -359,12 +376,16 @@ export default function TenantDashboard() {
               {announcements.slice(0, 2).map((ann) => (
                 <div
                   key={ann.announcement_id}
-                  className={`p-4 rounded-lg ${ann.is_pinned ? "bg-yellow-500/10 border border-yellow-500/30" : "bg-muted/50"}`}
+                  className={`p-4 rounded-lg ${
+                    ann.is_pinned
+                      ? "bg-yellow-500/10 border border-yellow-500/30"
+                      : "bg-muted/50"
+                  }`}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <h4 className="font-medium">{ann.title}</h4>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(ann.published_at)}
+                      {formatDate(ann.published_at, language)}
                     </p>
                   </div>
                   <p className="text-sm text-muted-foreground">{ann.content}</p>
@@ -379,26 +400,40 @@ export default function TenantDashboard() {
       {contract && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">ข้อมูลสัญญาเช่า</CardTitle>
+            <CardTitle className="text-lg">
+              {t("tenant.contract.title")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">วันเริ่มสัญญา</p>
-                <p className="font-medium">{formatDate(contract.start_date)}</p>
+                <p className="text-muted-foreground">
+                  {t("contracts.startDate")}
+                </p>
+                <p className="font-medium">
+                  {formatDate(contract.start_date, language)}
+                </p>
               </div>
               <div>
-                <p className="text-muted-foreground">วันสิ้นสุดสัญญา</p>
-                <p className="font-medium">{formatDate(contract.end_date)}</p>
+                <p className="text-muted-foreground">
+                  {t("contracts.endDate")}
+                </p>
+                <p className="font-medium">
+                  {formatDate(contract.end_date, language)}
+                </p>
               </div>
               <div>
-                <p className="text-muted-foreground">ค่าเช่ารายเดือน</p>
+                <p className="text-muted-foreground">
+                  {t("tenant.rentPerMonth")}
+                </p>
                 <p className="font-medium">
                   {formatCurrency(Number(contract.rent_amount))}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">เงินประกัน</p>
+                <p className="text-muted-foreground">
+                  {t("contracts.deposit")}
+                </p>
                 <p className="font-medium">
                   {formatCurrency(Number(contract.deposit_amount))}
                 </p>

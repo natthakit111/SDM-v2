@@ -1,6 +1,9 @@
+//admin/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/context/language-context";
 import { StatsCard } from "@/components/common/stats-card";
 import {
   Card,
@@ -31,20 +34,17 @@ import { tenantAPI } from "@/lib/api/tenant.api";
 import { formatCurrency } from "@/lib/mock-data";
 import Link from "next/link";
 
-// ── Types (ตรงกับ backend response) ──────────────────────────
 interface RoomStats {
   total: number;
   occupied: number;
   available: number;
   maintenance: number;
 }
-
 interface Room {
   room_id: number;
   room_number: string;
   status: "available" | "occupied" | "maintenance";
 }
-
 interface Bill {
   bill_id: number;
   room_id: number;
@@ -54,7 +54,6 @@ interface Bill {
   bill_month: number;
   bill_year: number;
 }
-
 interface MaintenanceRequest {
   request_id: number;
   category: string;
@@ -65,6 +64,7 @@ interface MaintenanceRequest {
 }
 
 export default function AdminDashboard() {
+  const { t } = useLanguage();
   const [roomStats, setRoomStats] = useState<RoomStats>({
     total: 0,
     occupied: 0,
@@ -89,18 +89,14 @@ export default function AdminDashboard() {
             maintenanceAPI.getAll(),
             tenantAPI.getAll(),
           ]);
-
-        // Backend ส่ง { success, data: {...} }
         setRoomStats(statsRes.data ?? statsRes);
         setRooms(roomsRes.data ?? roomsRes ?? []);
         setBills(billsRes.data ?? billsRes ?? []);
         setMaintenance(maintenanceRes.data ?? maintenanceRes ?? []);
-
-        // tenants — นับจาก array
         const tenantData = tenantsRes.data ?? tenantsRes ?? [];
         setTenantCount(Array.isArray(tenantData) ? tenantData.length : 0);
       } catch (err: any) {
-        setError(err.response?.data?.message ?? "โหลดข้อมูลไม่สำเร็จ");
+        setError(err.response?.data?.message ?? t("common.noData"));
       } finally {
         setLoading(false);
       }
@@ -108,7 +104,6 @@ export default function AdminDashboard() {
     fetchAll();
   }, []);
 
-  // ── Computed stats ────────────────────────────────────────
   const pendingBills = bills.filter(
     (b) => b.status === "pending" || b.status === "overdue",
   );
@@ -125,62 +120,60 @@ export default function AdminDashboard() {
   const pendingMaintenance = maintenance.filter(
     (m) => m.status === "pending" || m.status === "in_progress",
   );
-
   const recentBills = bills.slice(0, 5);
   const recentMaintenance = maintenance.slice(0, 5);
 
-  // ── Loading / Error ───────────────────────────────────────
-  if (loading) {
+  if (loading)
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
 
-  if (error) {
+  if (error)
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
         <p className="text-destructive">{error}</p>
-        <Button onClick={() => window.location.reload()}>ลองใหม่</Button>
+        <Button onClick={() => window.location.reload()}>
+          {t("common.confirm")}
+        </Button>
       </div>
     );
-  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">แดชบอร์ด</h1>
-        <p className="text-muted-foreground">ภาพรวมการจัดการหอพัก</p>
+        <h1 className="text-2xl font-bold">{t("menu.dashboard")}</h1>
+        <p className="text-muted-foreground">{t("rooms.subtitle")}</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
-          title="ห้องทั้งหมด"
+          title={t("rooms.title")}
           value={`${roomStats.occupied}/${roomStats.total}`}
-          description={`ว่าง ${roomStats.available} ห้อง`}
+          description={`${t("status.available")} ${roomStats.available}`}
           icon={DoorOpen}
           variant="primary"
         />
         <StatsCard
-          title="ผู้เช่าทั้งหมด"
+          title={t("tenants.title")}
           value={tenantCount}
-          description="คนที่กำลังเช่าอยู่"
+          description={t("status.active")}
           icon={Users}
           variant="default"
         />
         <StatsCard
-          title="บิลค้างชำระ"
+          title={t("bills.totalAmount")}
           value={formatCurrency(pendingAmount)}
-          description={`${pendingBills.length} รายการ`}
+          description={`${pendingBills.length} ${t("bills.list")}`}
           icon={Receipt}
           variant={overdueBills.length > 0 ? "destructive" : "warning"}
         />
         <StatsCard
-          title="รายได้เดือนนี้"
+          title={t("payments.history")}
           value={formatCurrency(monthlyIncome)}
-          description={`จาก ${paidBills.length} บิล`}
+          description={`${t("common.all")} ${paidBills.length} ${t("bills.list")}`}
           icon={Banknote}
           variant="success"
         />
@@ -198,15 +191,15 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-destructive">
-                      บิลเกินกำหนดชำระ
+                      {t("status.overdue")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      มี {overdueBills.length} รายการที่เกินกำหนดชำระ
+                      {overdueBills.length} {t("bills.list")}
                     </p>
                   </div>
                   <Link href="/admin/bills?status=overdue">
                     <Button variant="destructive" size="sm">
-                      ดูรายละเอียด
+                      {t("common.view")}
                     </Button>
                   </Link>
                 </div>
@@ -222,15 +215,15 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-warning-foreground">
-                      รายการแจ้งซ่อมรอดำเนินการ
+                      {t("maintenance.pending")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      มี {pendingMaintenance.length} รายการที่รอดำเนินการ
+                      {pendingMaintenance.length} {t("maintenance.list")}
                     </p>
                   </div>
                   <Link href="/admin/maintenance">
                     <Button variant="outline" size="sm">
-                      ดูรายละเอียด
+                      {t("common.view")}
                     </Button>
                   </Link>
                 </div>
@@ -242,16 +235,15 @@ export default function AdminDashboard() {
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Bills */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">บิลล่าสุด</CardTitle>
-              <CardDescription>รายการบิลที่สร้างล่าสุด</CardDescription>
+              <CardTitle className="text-lg">{t("bills.list")}</CardTitle>
+              <CardDescription>{t("bills.subtitle")}</CardDescription>
             </div>
             <Link href="/admin/bills">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
+                {t("common.viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
@@ -259,22 +251,22 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               {recentBills.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  ไม่มีรายการบิล
+                  {t("common.noData")}
                 </p>
               )}
               {recentBills.map((bill) => (
                 <div
                   key={bill.bill_id}
-                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  className="flex items-center justify-between py-2 border-b last:border-0"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-muted">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      {/* ✅ ใช้ room_number แทน roomNumber */}
                       <p className="font-medium">
-                        ห้อง {bill.room_number ?? bill.room_id}
+                        {t("rooms.roomNumber")}{" "}
+                        {bill.room_number ?? bill.room_id}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {bill.bill_month}/{bill.bill_year}
@@ -293,16 +285,15 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Maintenance */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">แจ้งซ่อมล่าสุด</CardTitle>
-              <CardDescription>รายการแจ้งซ่อมล่าสุด</CardDescription>
+              <CardTitle className="text-lg">{t("maintenance.list")}</CardTitle>
+              <CardDescription>{t("maintenance.subtitle")}</CardDescription>
             </div>
             <Link href="/admin/maintenance">
               <Button variant="ghost" size="sm">
-                ดูทั้งหมด <ArrowRight className="ml-2 h-4 w-4" />
+                {t("common.viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
@@ -310,23 +301,22 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               {recentMaintenance.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  ไม่มีรายการแจ้งซ่อม
+                  {t("common.noData")}
                 </p>
               )}
               {recentMaintenance.map((req) => (
                 <div
                   key={req.request_id}
-                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  className="flex items-center justify-between py-2 border-b last:border-0"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-muted">
                       <Wrench className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      {/* ✅ ใช้ category + description แทน title */}
                       <p className="font-medium">{req.category}</p>
                       <p className="text-sm text-muted-foreground">
-                        ห้อง {req.room_number ?? "-"}
+                        {t("rooms.roomNumber")} {req.room_number ?? "-"}
                       </p>
                     </div>
                   </div>
@@ -341,33 +331,30 @@ export default function AdminDashboard() {
       {/* Room Overview */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">ภาพรวมห้องพัก</CardTitle>
-          <CardDescription>สถานะห้องพักทั้งหมดในหอพัก</CardDescription>
+          <CardTitle className="text-lg">{t("rooms.list")}</CardTitle>
+          <CardDescription>{t("rooms.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           {rooms.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              ไม่มีข้อมูลห้องพัก
+              {t("common.noData")}
             </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
               {rooms.map((room) => (
                 <Link
                   key={room.room_id}
-                  href={`/admin/rooms`}
-                  className={`
-                    p-4 rounded-lg border text-center transition-colors hover:border-primary
+                  href="/admin/rooms"
+                  className={`p-4 rounded-lg border text-center transition-colors hover:border-primary
                     ${room.status === "available" ? "bg-success/10 border-success/30" : ""}
                     ${room.status === "occupied" ? "bg-primary/10 border-primary/30" : ""}
-                    ${room.status === "maintenance" ? "bg-warning/10 border-warning/30" : ""}
-                  `}
+                    ${room.status === "maintenance" ? "bg-warning/10 border-warning/30" : ""}`}
                 >
-                  {/* ✅ ใช้ room_number แทน number */}
                   <p className="font-bold text-lg">{room.room_number}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {room.status === "available" && "ว่าง"}
-                    {room.status === "occupied" && "มีผู้เช่า"}
-                    {room.status === "maintenance" && "ซ่อมบำรุง"}
+                    {room.status === "available" && t("status.available")}
+                    {room.status === "occupied" && t("status.occupied")}
+                    {room.status === "maintenance" && t("status.maintenance")}
                   </p>
                 </Link>
               ))}

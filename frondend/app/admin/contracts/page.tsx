@@ -71,18 +71,18 @@ const formatDate = (d: string) =>
     day: "numeric",
   });
 
-const formatCurrency = (n: number) => n.toLocaleString("th-TH") + " บาท";
-
-const statusLabel: Record<string, { label: string; color: string }> = {
-  active: { label: "ใช้งานอยู่", color: "bg-green-500/10 text-green-500" },
-  expired: { label: "หมดอายุ", color: "bg-red-500/10 text-red-500" },
-  terminated: { label: "ยกเลิกแล้ว", color: "bg-muted text-muted-foreground" },
+const statusColors: Record<string, string> = {
+  active: "bg-green-500/10 text-green-500",
+  expired: "bg-red-500/10 text-red-500",
+  terminated: "bg-muted text-muted-foreground",
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
   const { t } = useLanguage();
+  const formatCurrency = (n: number) =>
+    n.toLocaleString("th-TH") + " " + t("contracts.baht");
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [availableRooms, setAvailableRooms] = useState<any[]>([]);
@@ -103,7 +103,7 @@ export default function ContractsPage() {
       const res = await contractAPI.getAll(params);
       setContracts(res.data ?? []);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "โหลดข้อมูลสัญญาไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("contracts.loadError"));
     } finally {
       setLoading(false);
     }
@@ -163,12 +163,12 @@ export default function ContractsPage() {
           : undefined,
         note: formData.note || undefined,
       });
-      toast.success("สร้างสัญญาเรียบร้อย");
+      toast.success(t("contracts.createSuccess"));
       resetForm();
       fetchContracts();
       fetchFormOptions(); // refresh available rooms
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "สร้างสัญญาไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("contracts.createError"));
     } finally {
       setSubmitting(false);
     }
@@ -178,18 +178,20 @@ export default function ContractsPage() {
   const handleTerminate = async (contract: Contract) => {
     if (
       !confirm(
-        `ต้องการยกเลิกสัญญาของ ${contract.tenant_name} ห้อง ${contract.room_number} หรือไม่?`,
+        `${t("contracts.confirmTerminate")} ${contract.tenant_name} ${t("contracts.confirmTerminate2")} ${contract.room_number} ${t("contracts.confirmTerminate3")}`,
       )
     )
       return;
     try {
       const res = await contractAPI.terminate(contract.contract_id);
-      toast.success(res.message ?? "ยกเลิกสัญญาเรียบร้อย");
+      toast.success(res.message ?? t("contracts.terminateSuccess"));
       setViewingContract(null);
       fetchContracts();
       fetchFormOptions();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "ยกเลิกสัญญาไม่สำเร็จ");
+      toast.error(
+        err?.response?.data?.message ?? t("contracts.terminateError"),
+      );
     }
   };
 
@@ -209,9 +211,9 @@ export default function ContractsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">สัญญาเช่า</h1>
+          <h1 className="text-3xl font-bold">{t("contracts.title")}</h1>
           <p className="text-muted-foreground mt-2">
-            จัดการสัญญาเช่าและเงินประกัน
+            {t("contracts.subtitle")}
           </p>
         </div>
 
@@ -225,21 +227,21 @@ export default function ContractsPage() {
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
-              สัญญาใหม่
+              {t("contracts.new")}
             </Button>
           </DialogTrigger>
 
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>สร้างสัญญาเช่าใหม่</DialogTitle>
-              <DialogDescription>กรอกข้อมูลสัญญาเช่า</DialogDescription>
+              <DialogTitle>{t("contracts.newTitle")}</DialogTitle>
+              <DialogDescription>{t("contracts.newDesc")}</DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 {/* ผู้เช่า */}
                 <Field>
-                  <FieldLabel>ผู้เช่า</FieldLabel>
+                  <FieldLabel>{t("contracts.tenant")}</FieldLabel>
                   <Select
                     value={formData.tenant_id}
                     onValueChange={(v) =>
@@ -247,7 +249,7 @@ export default function ContractsPage() {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="เลือกผู้เช่า" />
+                      <SelectValue placeholder={t("contracts.selectTenant")} />
                     </SelectTrigger>
                     <SelectContent>
                       {tenants.map((t) => (
@@ -264,7 +266,7 @@ export default function ContractsPage() {
 
                 {/* ห้อง */}
                 <Field>
-                  <FieldLabel>ห้องพัก (ว่างอยู่)</FieldLabel>
+                  <FieldLabel>{t("contracts.availableRoom")}</FieldLabel>
                   <Select
                     value={formData.room_id}
                     onValueChange={(v) =>
@@ -272,13 +274,14 @@ export default function ContractsPage() {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="เลือกห้อง" />
+                      <SelectValue placeholder={t("contracts.selectRoom")} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableRooms.map((r) => (
                         <SelectItem key={r.room_id} value={String(r.room_id)}>
-                          ห้อง {r.room_number} —{" "}
-                          {r.base_rent?.toLocaleString("th-TH")} บาท/เดือน
+                          {t("contracts.room")} {r.room_number} —{" "}
+                          {r.base_rent?.toLocaleString("th-TH")}{" "}
+                          {t("contracts.perMonth")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -288,7 +291,9 @@ export default function ContractsPage() {
                 {/* วันที่ */}
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel htmlFor="start_date">วันเริ่มต้น</FieldLabel>
+                    <FieldLabel htmlFor="start_date">
+                      {t("contracts.startDate")}
+                    </FieldLabel>
                     <Input
                       id="start_date"
                       type="date"
@@ -298,7 +303,9 @@ export default function ContractsPage() {
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="end_date">วันสิ้นสุด</FieldLabel>
+                    <FieldLabel htmlFor="end_date">
+                      {t("contracts.endDate")}
+                    </FieldLabel>
                     <Input
                       id="end_date"
                       type="date"
@@ -313,19 +320,19 @@ export default function ContractsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
                     <FieldLabel htmlFor="rent_amount">
-                      ค่าเช่า/เดือน (บาท)
+                      {t("contracts.rentAmountBaht")}
                     </FieldLabel>
                     <Input
                       id="rent_amount"
                       type="number"
                       value={formData.rent_amount}
                       onChange={set("rent_amount")}
-                      placeholder="ใช้ค่าเช่าจากห้อง"
+                      placeholder={t("contracts.useRoomRent")}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="deposit_amount">
-                      เงินประกัน (บาท)
+                      {t("contracts.depositBaht")}
                     </FieldLabel>
                     <Input
                       id="deposit_amount"
@@ -338,12 +345,12 @@ export default function ContractsPage() {
                 </div>
 
                 <Field>
-                  <FieldLabel htmlFor="note">หมายเหตุ</FieldLabel>
+                  <FieldLabel htmlFor="note">{t("common.note")}</FieldLabel>
                   <Input
                     id="note"
                     value={formData.note}
                     onChange={set("note")}
-                    placeholder="หมายเหตุเพิ่มเติม"
+                    placeholder={t("contracts.noteExtra")}
                   />
                 </Field>
               </FieldGroup>
@@ -355,7 +362,7 @@ export default function ContractsPage() {
                   onClick={resetForm}
                   disabled={submitting}
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -366,7 +373,7 @@ export default function ContractsPage() {
                   {submitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  สร้างสัญญา
+                  {t("contracts.create")}
                 </Button>
               </DialogFooter>
             </form>
@@ -379,7 +386,7 @@ export default function ContractsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              รวมทั้งหมด
+              {t("contracts.statsTotal")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -389,7 +396,7 @@ export default function ContractsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              ใช้งานอยู่
+              {t("contracts.statsActive")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -401,7 +408,7 @@ export default function ContractsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              หมดอายุ/ยกเลิก
+              {t("contracts.statsExpiredOrTerminated")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -413,12 +420,12 @@ export default function ContractsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              รวมเงินประกัน
+              {t("contracts.statsTotalDeposit")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalDeposit.toLocaleString("th-TH")} บาท
+              {totalDeposit.toLocaleString("th-TH")} {t("contracts.baht")}
             </div>
           </CardContent>
         </Card>
@@ -431,7 +438,7 @@ export default function ContractsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหา ชื่อ ห้อง หรือ ID..."
+                placeholder={t("contracts.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -442,10 +449,16 @@ export default function ContractsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                <SelectItem value="active">ใช้งานอยู่</SelectItem>
-                <SelectItem value="expired">หมดอายุ</SelectItem>
-                <SelectItem value="terminated">ยกเลิกแล้ว</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="active">
+                  {t("status.active.label")}
+                </SelectItem>
+                <SelectItem value="expired">
+                  {t("status.expired.label")}
+                </SelectItem>
+                <SelectItem value="terminated">
+                  {t("status.terminated.label")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -456,12 +469,14 @@ export default function ContractsPage() {
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
           <Loader2 className="h-5 w-5 animate-spin" />
-          กำลังโหลด...
+          {t("common.loading")}
         </div>
       ) : (
         <div className="space-y-3">
           {filteredContracts.map((contract) => {
-            const s = statusLabel[contract.status] ?? statusLabel.expired;
+            const statusColor =
+              statusColors[contract.status] ?? statusColors.expired;
+            const statusKey = `status.${contract.status}.label` as string;
             return (
               <Card key={contract.contract_id}>
                 <CardContent className="pt-6">
@@ -477,23 +492,23 @@ export default function ContractsPage() {
                               {contract.tenant_name}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              ห้อง {contract.room_number} • CNT
+                              {t("contracts.room")} {contract.room_number} • CNT
                               {String(contract.contract_id).padStart(3, "0")}
                             </p>
                             <div className="flex gap-2 mt-3 flex-wrap">
                               <span className="text-xs bg-muted px-2 py-1 rounded">
-                                ค่าเช่า{" "}
+                                {t("contracts.rentLabel")}{" "}
                                 {Number(contract.rent_amount).toLocaleString(
                                   "th-TH",
                                 )}{" "}
-                                บาท
+                                {t("contracts.baht")}
                               </span>
                               <span className="text-xs bg-muted px-2 py-1 rounded">
-                                เงินประกัน{" "}
+                                {t("contracts.depositLabel")}{" "}
                                 {Number(contract.deposit_amount).toLocaleString(
                                   "th-TH",
                                 )}{" "}
-                                บาท
+                                {t("contracts.baht")}
                               </span>
                               <span className="text-xs bg-muted px-2 py-1 rounded">
                                 {formatDate(contract.start_date)} —{" "}
@@ -502,9 +517,9 @@ export default function ContractsPage() {
                             </div>
                           </div>
                           <span
-                            className={`text-xs font-medium px-2 py-1 rounded ${s.color}`}
+                            className={`text-xs font-medium px-2 py-1 rounded ${statusColor}`}
                           >
-                            {s.label}
+                            {t(statusKey)}
                           </span>
                         </div>
                       </div>
@@ -518,7 +533,9 @@ export default function ContractsPage() {
                         onClick={() => setViewingContract(contract)}
                       >
                         <Eye className="w-4 h-4" />
-                        <span className="hidden sm:inline">ดู</span>
+                        <span className="hidden sm:inline">
+                          {t("common.view")}
+                        </span>
                       </Button>
                       {contract.status === "active" && (
                         <Button
@@ -528,7 +545,9 @@ export default function ContractsPage() {
                           onClick={() => handleTerminate(contract)}
                         >
                           <XCircle className="w-4 h-4" />
-                          <span className="hidden sm:inline">ยกเลิก</span>
+                          <span className="hidden sm:inline">
+                            {t("common.cancel")}
+                          </span>
                         </Button>
                       )}
                     </div>
@@ -542,7 +561,9 @@ export default function ContractsPage() {
             <Card>
               <CardContent className="pt-6 text-center py-12">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground">ไม่พบสัญญาเช่า</p>
+                <p className="text-muted-foreground">
+                  {t("contracts.notFound")}
+                </p>
               </CardContent>
             </Card>
           )}
@@ -556,39 +577,49 @@ export default function ContractsPage() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>รายละเอียดสัญญาเช่า</DialogTitle>
+            <DialogTitle>{t("contracts.detailTitle")}</DialogTitle>
           </DialogHeader>
           {viewingContract && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">ชื่อผู้เช่า</p>
+                  <p className="text-muted-foreground">
+                    {t("contracts.tenantName")}
+                  </p>
                   <p className="font-medium">{viewingContract.tenant_name}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">ห้อง</p>
+                  <p className="text-muted-foreground">{t("contracts.room")}</p>
                   <p className="font-medium">{viewingContract.room_number}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">วันเริ่มต้น</p>
+                  <p className="text-muted-foreground">
+                    {t("contracts.startDate")}
+                  </p>
                   <p className="font-medium">
                     {formatDate(viewingContract.start_date)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">วันสิ้นสุด</p>
+                  <p className="text-muted-foreground">
+                    {t("contracts.endDate")}
+                  </p>
                   <p className="font-medium">
                     {formatDate(viewingContract.end_date)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">ค่าเช่ารายเดือน</p>
+                  <p className="text-muted-foreground">
+                    {t("contracts.monthlyRent")}
+                  </p>
                   <p className="font-medium">
                     {formatCurrency(Number(viewingContract.rent_amount))}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">เงินประกัน</p>
+                  <p className="text-muted-foreground">
+                    {t("contracts.deposit")}
+                  </p>
                   <p className="font-medium">
                     {formatCurrency(Number(viewingContract.deposit_amount))}
                   </p>
@@ -596,7 +627,7 @@ export default function ContractsPage() {
               </div>
               {viewingContract.note && (
                 <div className="text-sm">
-                  <p className="text-muted-foreground">หมายเหตุ</p>
+                  <p className="text-muted-foreground">{t("common.note")}</p>
                   <p>{viewingContract.note}</p>
                 </div>
               )}
@@ -607,7 +638,7 @@ export default function ContractsPage() {
                   onClick={() => handleTerminate(viewingContract)}
                 >
                   <XCircle className="w-4 h-4" />
-                  ยกเลิกสัญญา (Check-out)
+                  {t("contracts.terminateAction")}
                 </Button>
               )}
             </div>

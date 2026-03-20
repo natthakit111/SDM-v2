@@ -27,12 +27,14 @@ import {
   FileText,
   Settings,
   LogOut,
+  Languages,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
 
   const menuItems = [
     {
@@ -92,7 +94,7 @@ export function AdminSidebar() {
           </div>
           <div>
             <h1 className="font-bold text-lg">DormFlow</h1>
-            <p className="text-xs text-muted-foreground">ระบบจัดการหอพัก</p>
+            <p className="text-xs text-muted-foreground">{t("common.admin")}</p>
           </div>
         </Link>
       </SidebarHeader>
@@ -128,8 +130,65 @@ export function AdminSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
+          {/* Language Toggle */}
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <Languages className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm text-muted-foreground flex-1">
+                {t("common.language")}
+              </span>
+              <div className="flex rounded-md border border-border overflow-hidden text-xs font-medium">
+                <button
+                  onClick={() => setLanguage("th")}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors",
+                    language === "th"
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground",
+                  )}
+                >
+                  TH
+                </button>
+                <button
+                  onClick={() => setLanguage("en")}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors border-l border-border",
+                    language === "en"
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground",
+                  )}
+                >
+                  EN
+                </button>
+              </div>
+            </div>
+          </SidebarMenuItem>
+
+          {/* ✅ Profile */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === "/admin/profile"}
+              className={cn(
+                pathname === "/admin/profile" && "bg-primary/20 text-primary",
+              )}
+            >
+              <Link href="/admin/profile">
+                <UserCircle className="h-4 w-4" />
+                <span>{t("common.profile")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          {/* Settings */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === "/admin/settings"}
+              className={cn(
+                pathname === "/admin/settings" && "bg-primary/20 text-primary",
+              )}
+            >
               <Link href="/admin/settings">
                 <Settings className="h-4 w-4" />
                 <span>{t("menu.settings")}</span>

@@ -26,10 +26,10 @@ import {
   MaintenanceStatusBadge,
   PriorityBadge,
 } from "@/components/common/status-badge";
-import { Plus, CheckCircle, Loader2 } from "lucide-react";
+import { Plus, CheckCircle, Loader2, Wrench } from "lucide-react";
 import { maintenanceAPI } from "@/lib/api/maintenance.api";
-import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
+import { toast } from "sonner";
 
 interface Request {
   request_id: number;
@@ -41,15 +41,8 @@ interface Request {
   admin_note: string | null;
 }
 
-const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
 export default function TenantMaintenancePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -62,11 +55,18 @@ export default function TenantMaintenancePage() {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
   const fetchRequests = () => {
     maintenanceAPI
       .getMyRequests()
       .then((r) => setRequests(r.data ?? []))
-      .catch(() => toast.error("โหลดข้อมูลไม่สำเร็จ"))
+      .catch(() => toast.error(t("maintenance.loadError")))
       .finally(() => setLoading(false));
   };
 
@@ -76,7 +76,7 @@ export default function TenantMaintenancePage() {
 
   const handleSubmit = async () => {
     if (!formData.category || formData.description.length < 10) {
-      toast.error("กรุณากรอกข้อมูลให้ครบ (รายละเอียดอย่างน้อย 10 ตัวอักษร)");
+      toast.error(t("settings.errorFillAll"));
       return;
     }
     setSubmitting(true);
@@ -91,107 +91,90 @@ export default function TenantMaintenancePage() {
         fetchRequests();
       }, 1500);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "ส่งคำขอไม่สำเร็จ");
+      toast.error(err?.response?.data?.message ?? t("maintenance.updateError"));
     } finally {
       setSubmitting(false);
     }
   };
 
+  const categoryOptions = [
+    { value: "ซ่อมแซม", label: language === "th" ? "ซ่อมแซม" : "Repair" },
+    { value: "ทำความสะอาด", label: language === "th" ? "ทำความสะอาด" : "Cleaning" },
+    { value: "ไฟฟ้า", label: language === "th" ? "ไฟฟ้า" : "Electrical" },
+    { value: "ประปา", label: language === "th" ? "ประปา" : "Plumbing" },
+    { value: "อื่นๆ", label: language === "th" ? "อื่นๆ" : "Other" },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">ขอซ่อมแซม</h1>
-          <p className="text-muted-foreground mt-2">
-            ส่งคำขอซ่อมแซมหรือปัญหาต่างๆ
-          </p>
+          <h1 className="text-3xl font-bold">{t("tenant.maintenance.title")}</h1>
+          <p className="text-muted-foreground mt-2">{t("tenant.maintenance.subtitle")}</p>
         </div>
 
-        <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) setDone(false);
-          }}
-        >
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setDone(false); }}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
-              ส่งคำขอใหม่
+              {t("tenant.maintenance.new")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>ส่งคำขอซ่อมแซม</DialogTitle>
-              <DialogDescription>
-                อธิบายปัญหาและเราจะดำเนินการ
-              </DialogDescription>
+              <DialogTitle>{t("tenant.maintenance.title")}</DialogTitle>
+              <DialogDescription>{t("tenant.maintenance.subtitle")}</DialogDescription>
             </DialogHeader>
 
             {done ? (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <p className="font-medium">ส่งคำขอสำเร็จ</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  ทีมของเราจะดำเนินการเร็วๆ นี้
-                </p>
+                <p className="font-medium">{t("tenant.maintenance.success")}</p>
               </div>
             ) : (
               <FieldGroup>
                 <Field>
-                  <FieldLabel>หมวดหมู่</FieldLabel>
+                  <FieldLabel>{t("maintenance.colCategory")}</FieldLabel>
                   <Select
                     value={formData.category}
-                    onValueChange={(v) =>
-                      setFormData((p) => ({ ...p, category: v }))
-                    }
+                    onValueChange={(v) => setFormData((p) => ({ ...p, category: v }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="เลือกหมวดหมู่" />
+                      <SelectValue placeholder={t("maintenance.colCategory")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ซ่อมแซม">ซ่อมแซม</SelectItem>
-                      <SelectItem value="ทำความสะอาด">ทำความสะอาด</SelectItem>
-                      <SelectItem value="ไฟฟ้า">ไฟฟ้า</SelectItem>
-                      <SelectItem value="ประปา">ประปา</SelectItem>
-                      <SelectItem value="อื่นๆ">อื่นๆ</SelectItem>
+                      {categoryOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel>รายละเอียด (อย่างน้อย 10 ตัวอักษร)</FieldLabel>
+                  <FieldLabel>{t("maintenance.description")}</FieldLabel>
                   <Textarea
-                    placeholder="อธิบายปัญหาอย่างละเอียด"
+                    placeholder={t("maintenance.description")}
                     value={formData.description}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        description: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
                     className="min-h-28"
                   />
                 </Field>
                 <Field>
-                  <FieldLabel>ความเร่งด่วน</FieldLabel>
+                  <FieldLabel>{t("maintenance.colPriority")}</FieldLabel>
                   <Select
                     value={formData.priority}
-                    onValueChange={(v) =>
-                      setFormData((p) => ({ ...p, priority: v }))
-                    }
+                    onValueChange={(v) => setFormData((p) => ({ ...p, priority: v }))}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">ไม่ด่วน</SelectItem>
-                      <SelectItem value="medium">ปกติ</SelectItem>
-                      <SelectItem value="high">ด่วน</SelectItem>
+                      <SelectItem value="low">{t("priority.low")}</SelectItem>
+                      <SelectItem value="medium">{t("priority.medium")}</SelectItem>
+                      <SelectItem value="high">{t("priority.high")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel>รูปภาพประกอบ (ไม่บังคับ)</FieldLabel>
+                  <FieldLabel>{t("meters.image")} ({t("common.note")})</FieldLabel>
                   <Input
                     type="file"
                     accept="image/*"
@@ -203,18 +186,12 @@ export default function TenantMaintenancePage() {
 
             {!done && (
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={submitting}
-                >
-                  ยกเลิก
+                <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+                  {t("common.cancel")}
                 </Button>
                 <Button onClick={handleSubmit} disabled={submitting}>
-                  {submitting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  ส่งคำขอ
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {t("common.submit")}
                 </Button>
               </DialogFooter>
             )}
@@ -225,23 +202,13 @@ export default function TenantMaintenancePage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "รวมทั้งหมด", value: requests.length, color: "" },
-          {
-            label: "กำลังดำเนินการ",
-            value: requests.filter((r) => r.status === "in_progress").length,
-            color: "text-blue-500",
-          },
-          {
-            label: "เสร็จสิ้น",
-            value: requests.filter((r) => r.status === "resolved").length,
-            color: "text-green-500",
-          },
+          { label: t("common.all"), value: requests.length, color: "" },
+          { label: t("status.in_progress"), value: requests.filter((r) => r.status === "in_progress").length, color: "text-blue-500" },
+          { label: t("status.resolved"), value: requests.filter((r) => r.status === "resolved").length, color: "text-green-500" },
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {label}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${color}`}>{value}</div>
@@ -253,40 +220,37 @@ export default function TenantMaintenancePage() {
       {/* List */}
       <Card>
         <CardHeader>
-          <CardTitle>คำขอซ่อมแซมทั้งหมด</CardTitle>
+          <CardTitle>{t("maintenance.listTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+              <Loader2 className="h-5 w-5 animate-spin" />
+              {t("common.loading")}
             </div>
           ) : requests.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              ยังไม่มีคำขอซ่อมแซม
-            </p>
+            // ✅ Empty state สำหรับ tenant ใหม่
+            <div className="text-center py-12">
+              <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
+              <p className="font-medium text-muted-foreground">{t("empty.noMaintenance")}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t("empty.noMaintenanceDesc")}</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {requests.map((r) => (
-                <div
-                  key={r.request_id}
-                  className="flex items-start gap-4 p-4 border rounded-lg"
-                >
+                <div key={r.request_id} className="flex items-start gap-4 p-4 border rounded-lg">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium">{r.category}</p>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {r.description}
-                        </p>
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{r.description}</p>
                         <div className="flex gap-2 mt-2">
                           <PriorityBadge priority={r.priority} />
-                          <span className="text-xs text-muted-foreground">
-                            {fmtDate(r.created_at)}
-                          </span>
+                          <span className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</span>
                         </div>
                         {r.admin_note && (
                           <p className="text-xs text-muted-foreground mt-2 bg-muted/50 px-2 py-1 rounded">
-                            หมายเหตุ: {r.admin_note}
+                            {t("maintenance.adminNote")}: {r.admin_note}
                           </p>
                         )}
                       </div>

@@ -1,3 +1,5 @@
+//payment-verification/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -30,6 +32,7 @@ import {
 import { PaymentStatusBadge } from "@/components/common/status-badge";
 import { paymentAPI } from "@/lib/api/payment.api";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
 interface Payment {
   payment_id: number;
@@ -46,16 +49,27 @@ interface Payment {
   created_at: string;
 }
 
-const getMethodLabel = (method: string) => {
-  const map: Record<string, string> = {
-    qr_promptpay: "พร้อมเพย์",
-    cash: "เงินสด",
-    bank_transfer: "โอนเงิน",
-  };
-  return map[method] ?? method;
-};
-
 export default function PaymentVerificationPage() {
+  const { t } = useLanguage();
+
+  const getMethodLabel = (method: string) =>
+    (
+      ({
+        qr_promptpay: t("payment.methodQR"),
+        cash: t("payment.methodCash"),
+        bank_transfer: t("payment.methodTransfer"),
+      }) as Record<string, string>
+    )[method] ?? method;
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,7 +88,7 @@ export default function PaymentVerificationPage() {
       const res = await paymentAPI.getAll(params);
       setPayments(res?.data ?? res ?? []);
     } catch {
-      toast.error("โหลดข้อมูลไม่สำเร็จ");
+      toast.error(t("payment.loadError"));
     } finally {
       setLoading(false);
     }
@@ -118,12 +132,12 @@ export default function PaymentVerificationPage() {
     try {
       setActionLoading(true);
       await paymentAPI.verify(selectedPayment.payment_id);
-      toast.success("อนุมัติการชำระเงินเรียบร้อย");
+      toast.success(t("payment.approveSuccess"));
       setDetailsDialogOpen(false);
       setSelectedPayment(null);
       fetchPayments();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
+      toast.error(err?.response?.data?.message ?? t("payment.actionError"));
     } finally {
       setActionLoading(false);
     }
@@ -131,20 +145,20 @@ export default function PaymentVerificationPage() {
 
   const handleRejectSubmit = async () => {
     if (!selectedPayment || !rejectReason.trim()) {
-      toast.error("กรุณาระบุเหตุผล");
+      toast.error(t("payment.rejectReasonRequired"));
       return;
     }
     try {
       setActionLoading(true);
       await paymentAPI.reject(selectedPayment.payment_id, rejectReason);
-      toast.success("ปฏิเสธการชำระเงินแล้ว");
+      toast.success(t("payment.rejectSuccess"));
       setRejectDialogOpen(false);
       setDetailsDialogOpen(false);
       setRejectReason("");
       setSelectedPayment(null);
       fetchPayments();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
+      toast.error(err?.response?.data?.message ?? t("payment.actionError"));
     } finally {
       setActionLoading(false);
     }
@@ -156,21 +170,12 @@ export default function PaymentVerificationPage() {
     return `${process.env.NEXT_PUBLIC_API_URL ?? ""}/${path}`;
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("th-TH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">ตรวจสอบการชำระเงิน</h1>
+        <h1 className="text-3xl font-bold">{t("paymentVerify.title")}</h1>
         <p className="text-muted-foreground mt-2">
-          ตรวจสอบและอนุมัติการชำระเงินจากสลิป
+          {t("paymentVerify.subtitle")}
         </p>
       </div>
 
@@ -179,7 +184,7 @@ export default function PaymentVerificationPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              รวมทั้งหมด
+              {t("paymentVerify.statsTotal")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -189,7 +194,7 @@ export default function PaymentVerificationPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              รอการตรวจสอบ
+              {t("paymentVerify.statsPending")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -201,7 +206,7 @@ export default function PaymentVerificationPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              ตรวจสอบแล้ว
+              {t("paymentVerify.statsVerified")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -213,7 +218,7 @@ export default function PaymentVerificationPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              ปฏิเสธ
+              {t("paymentVerify.statsRejected")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -230,7 +235,7 @@ export default function PaymentVerificationPage() {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
-                placeholder="ค้นหา ชื่อ ห้อง บิล หรือ ID..."
+                placeholder={t("payment.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -240,10 +245,16 @@ export default function PaymentVerificationPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                <SelectItem value="pending_verify">รอการตรวจสอบ</SelectItem>
-                <SelectItem value="verified">ตรวจสอบแล้ว</SelectItem>
-                <SelectItem value="rejected">ปฏิเสธ</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="pending_verify">
+                  {t("paymentVerify.statsPending")}
+                </SelectItem>
+                <SelectItem value="verified">
+                  {t("paymentVerify.statsVerified")}
+                </SelectItem>
+                <SelectItem value="rejected">
+                  {t("paymentVerify.statsRejected")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -270,14 +281,15 @@ export default function PaymentVerificationPage() {
                             {payment.tenant_name}
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            ห้อง {payment.room_number} • บิล #{payment.bill_id}
+                            {t("contracts.room")} {payment.room_number} •{" "}
+                            {t("payment.billNo")} #{payment.bill_id}
                           </p>
                           <div className="flex gap-2 mt-3 flex-wrap">
                             <span className="text-xs bg-muted px-2 py-1 rounded">
                               {Number(payment.amount_paid).toLocaleString(
                                 "th-TH",
                               )}{" "}
-                              บาท
+                              {t("contracts.baht")}
                             </span>
                             <span className="text-xs bg-muted px-2 py-1 rounded">
                               {getMethodLabel(payment.payment_method)}
@@ -307,7 +319,9 @@ export default function PaymentVerificationPage() {
                       }}
                     >
                       <Eye className="w-4 h-4" />
-                      <span className="hidden sm:inline">ดู</span>
+                      <span className="hidden sm:inline">
+                        {t("common.view")}
+                      </span>
                     </Button>
                   </div>
                 </div>
@@ -319,7 +333,7 @@ export default function PaymentVerificationPage() {
             <Card>
               <CardContent className="pt-6 text-center py-12">
                 <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground">ไม่พบรายการ</p>
+                <p className="text-muted-foreground">{t("common.noData")}</p>
               </CardContent>
             </Card>
           )}
@@ -338,54 +352,65 @@ export default function PaymentVerificationPage() {
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>รายละเอียดการชำระเงิน</DialogTitle>
+            <DialogTitle>{t("payment.detailTitle")}</DialogTitle>
           </DialogHeader>
           {selectedPayment && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">ชื่อผู้เช่า</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("contracts.tenantName")}
+                  </p>
                   <p className="font-medium">{selectedPayment.tenant_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">ห้อง</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("contracts.room")}
+                  </p>
                   <p className="font-medium">{selectedPayment.room_number}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">บิล #</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("payment.billNo")} #
+                  </p>
                   <p className="font-medium">{selectedPayment.bill_id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">จำนวนเงิน</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("common.amount")}
+                  </p>
                   <p className="font-bold text-lg">
                     {Number(selectedPayment.amount_paid).toLocaleString(
                       "th-TH",
                     )}{" "}
-                    บาท
+                    {t("contracts.baht")}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">วิธีชำระ</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("payment.method")}
+                  </p>
                   <p className="font-medium">
                     {getMethodLabel(selectedPayment.payment_method)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">วันที่ชำระ</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("payment.paidDate")}
+                  </p>
                   <p className="font-medium">
                     {formatDate(selectedPayment.created_at)}
                   </p>
                 </div>
               </div>
 
-              {/* Slip Image */}
               <div>
-                <p className="text-sm font-medium mb-2">รูปสลิป</p>
+                <p className="text-sm font-medium mb-2">{t("payment.slip")}</p>
                 {selectedPayment.slip_image ? (
                   <div className="border rounded-lg overflow-hidden bg-muted/30">
                     <img
                       src={slipUrl(selectedPayment.slip_image) ?? ""}
-                      alt="สลิปการชำระเงิน"
+                      alt={t("payment.slip")}
                       className="w-full max-h-72 object-contain"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
@@ -399,19 +424,20 @@ export default function PaymentVerificationPage() {
                           rel="noopener noreferrer"
                         >
                           <ImageIcon className="mr-1 h-4 w-4" />
-                          ดูรูปขนาดเต็ม
+                          {t("payment.viewFullImage")}
                         </a>
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="bg-muted p-4 rounded-lg aspect-video flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">ไม่มีสลิป</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("payment.noSlip")}
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Actions — pending_verify only */}
               {selectedPayment.status === "pending_verify" && (
                 <div className="flex gap-2">
                   <Button
@@ -424,7 +450,7 @@ export default function PaymentVerificationPage() {
                     ) : (
                       <CheckCircle className="w-4 h-4" />
                     )}
-                    อนุมัติ
+                    {t("moveout.approve")}
                   </Button>
                   <Button
                     variant="destructive"
@@ -436,16 +462,17 @@ export default function PaymentVerificationPage() {
                     }}
                   >
                     <XCircle className="w-4 h-4" />
-                    ปฏิเสธ
+                    {t("payment.reject")}
                   </Button>
                 </div>
               )}
 
-              {/* Info for non-pending */}
               {selectedPayment.status !== "pending_verify" &&
                 selectedPayment.remark && (
                   <div>
-                    <p className="text-sm text-muted-foreground">หมายเหตุ</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("common.note")}
+                    </p>
                     <p className="p-2 bg-muted rounded text-sm italic">
                       {selectedPayment.remark}
                     </p>
@@ -468,21 +495,25 @@ export default function PaymentVerificationPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>ปฏิเสธการชำระเงิน</DialogTitle>
-            <DialogDescription>ระบุเหตุผลในการปฏิเสธ</DialogDescription>
+            <DialogTitle>{t("payment.rejectDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("payment.rejectDialogDesc")}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium">ผู้เช่า</p>
+              <p className="text-sm font-medium">{t("common.tenant")}</p>
               <p>
-                {selectedPayment?.tenant_name} — ห้อง{" "}
+                {selectedPayment?.tenant_name} — {t("contracts.room")}{" "}
                 {selectedPayment?.room_number}
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium block mb-2">เหตุผล</label>
+              <label className="text-sm font-medium block mb-2">
+                {t("payment.rejectReason")}
+              </label>
               <Textarea
-                placeholder="เช่น จำนวนเงินไม่ตรง, สลิปไม่ชัดเจน ฯลฯ"
+                placeholder={t("payment.rejectReasonPlaceholder")}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
               />
@@ -498,7 +529,7 @@ export default function PaymentVerificationPage() {
               ) : (
                 <XCircle className="mr-2 w-4 h-4" />
               )}
-              ยืนยันการปฏิเสธ
+              {t("payment.confirmReject")}
             </Button>
           </div>
         </DialogContent>

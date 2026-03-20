@@ -68,7 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) {
         try {
           const res = await api.get("/auth/me");
-          // Backend wraps in { success, data: { ...user } }
           const backendUser = res.data.data ?? res.data.user ?? res.data;
           setUser(mapUser(backendUser));
         } catch {
@@ -84,8 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.post("/auth/login", { username, password });
 
-      // ✅ Backend response: { success, message, data: { token, user } }
-      const payload = res.data.data; // { token, user }
+      const payload = res.data.data;
       const token = payload?.token;
       const backendUser = payload?.user;
 
@@ -95,7 +93,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem("token", token);
 
-      // ถ้า backend ไม่ส่ง user มาใน login response → ดึงจาก /auth/me
       let mappedUser: User;
       if (backendUser) {
         mappedUser = mapUser(backendUser);
@@ -119,6 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post("/auth/register", {
         username: data.username,
         password: data.password,
+        name: data.name, // ✅ แก้ไข: เพิ่ม name
+        email: data.email, // ✅ แก้ไข: เพิ่ม email
+        phone: data.phone, // ✅ แก้ไข: เพิ่ม phone
         role: "tenant",
       });
       return { success: true };

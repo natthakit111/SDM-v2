@@ -37,7 +37,6 @@ const signToken = (user) => {
 // ─────────────────────────────────────────────
 const register = async (req, res, next) => {
   try {
-    // Validate request body
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return sendBadRequest(res, 'Validation failed', errors.array());
@@ -78,24 +77,20 @@ const login = async (req, res, next) => {
 
     const { username, password } = req.body;
 
-    // Find user
     const user = await UserModel.findByUsername(username);
     if (!user) {
       return sendUnauthorized(res, 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
 
-    // Check if account is active
     if (!user.is_active) {
       return sendUnauthorized(res, 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
     }
 
-    // Verify password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return sendUnauthorized(res, 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
 
-    // Sign JWT
     const token = signToken(user);
 
     return sendSuccess(
@@ -118,7 +113,6 @@ const login = async (req, res, next) => {
 // ─────────────────────────────────────────────
 // GET /api/auth/me
 // Protected: requires valid JWT
-// Returns: current logged-in user's info
 // ─────────────────────────────────────────────
 const getMe = async (req, res, next) => {
   try {
@@ -127,6 +121,39 @@ const getMe = async (req, res, next) => {
       return sendUnauthorized(res, 'User no longer exists');
     }
     return sendSuccess(res, user);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PUT /api/auth/profile
+// Protected: requires valid JWT
+// Body: { firstName, lastName, email, phone }
+// ─────────────────────────────────────────────
+const updateProfile = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return sendBadRequest(res, 'Validation failed', errors.array());
+    }
+
+    const { firstName, lastName, email, phone } = req.body;
+    const { pool } = require('../config/db');
+
+    await pool.query(
+      `UPDATE users 
+       SET first_name = ?, last_name = ?, email = ?, phone = ?
+       WHERE user_id = ?`,
+      [firstName || null, lastName || null, email || null, phone || null, req.user.user_id]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT user_id, username, role, first_name, last_name, email, phone, telegram_chat_id FROM users WHERE user_id = ?',
+      [req.user.user_id]
+    );
+
+    return sendSuccess(res, rows[0], 'Profile updated successfully');
   } catch (err) {
     next(err);
   }
@@ -145,9 +172,8 @@ const changePassword = async (req, res, next) => {
     }
 
     const { currentPassword, newPassword } = req.body;
-
-    // Fetch full user record (with password_hash)
     const { pool } = require('../config/db');
+
     const [rows] = await pool.query(
       'SELECT * FROM users WHERE user_id = ? LIMIT 1',
       [req.user.user_id]
@@ -155,13 +181,11 @@ const changePassword = async (req, res, next) => {
     const user = rows[0];
     if (!user) return sendUnauthorized(res, 'User not found');
 
-    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isMatch) {
       return sendBadRequest(res, 'Current password is incorrect');
     }
 
-    // Hash new password and update
     const salt = await bcrypt.genSalt(12);
     const newHash = await bcrypt.hash(newPassword, salt);
     await pool.query(
@@ -175,4 +199,4 @@ const changePassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, getMe, changePassword };
+module.exports = { register, login, getMe, updateProfile, changePassword };

@@ -1,3 +1,5 @@
+//tenant/notifications/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,6 +10,7 @@ import { Bell, Trash2, CheckCircle2, Loader2 } from "lucide-react";
 import { billAPI } from "@/lib/api/bill.api";
 import { maintenanceAPI } from "@/lib/api/maintenance.api";
 import { announcementAPI } from "@/lib/api/announcement.api";
+import { useLanguage } from "@/context/language-context";
 
 interface Notification {
   id: string;
@@ -31,10 +34,17 @@ const typeColors: Record<string, string> = {
 };
 
 export default function TenantNotificationsPage() {
+  const { t, language } = useLanguage();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // สร้าง notification จากข้อมูลจริง
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
   useEffect(() => {
     const build = async () => {
       const items: Notification[] = [];
@@ -55,9 +65,12 @@ export default function TenantNotificationsPage() {
               items.push({
                 id: `bill-${b.bill_id}`,
                 type: "bill",
-                title: b.status === "overdue" ? "บิลเกินกำหนด!" : "บิลรอชำระ",
-                message: `บิลเดือน ${b.bill_month}/${b.bill_year} ยอด ${Number(b.total_amount).toLocaleString("th-TH")} บาท`,
-                timestamp: new Date(b.due_date).toLocaleDateString("th-TH"),
+                title:
+                  b.status === "overdue"
+                    ? t("tenant.overdueBill")
+                    : t("tenant.pendingBill"),
+                message: `${t(`month.${b.bill_month}`)} ${b.bill_year} • ${t("bills.totalAmount")} ${Number(b.total_amount).toLocaleString("th-TH")} ฿`,
+                timestamp: fmtDate(b.due_date),
                 isRead: false,
               });
             });
@@ -71,9 +84,9 @@ export default function TenantNotificationsPage() {
               items.push({
                 id: `maint-${r.request_id}`,
                 type: "maintenance",
-                title: "การซ่อมแซมเสร็จสิ้น",
-                message: `${r.category} — ดำเนินการเสร็จแล้ว`,
-                timestamp: new Date(r.created_at).toLocaleDateString("th-TH"),
+                title: t("status.resolved"),
+                message: `${r.category} — ${t("status.resolved")}`,
+                timestamp: fmtDate(r.created_at),
                 isRead: true,
               });
             });
@@ -85,9 +98,9 @@ export default function TenantNotificationsPage() {
             items.push({
               id: `ann-${a.announcement_id}`,
               type: "announcement",
-              title: "ประกาศใหม่",
+              title: t("announcements.title"),
               message: a.title,
-              timestamp: new Date(a.published_at).toLocaleDateString("th-TH"),
+              timestamp: fmtDate(a.published_at),
               isRead: a.is_pinned !== 1,
             });
           });
@@ -100,7 +113,7 @@ export default function TenantNotificationsPage() {
       setLoading(false);
     };
     build();
-  }, []);
+  }, [language]); // re-build เมื่อ language เปลี่ยน
 
   const markRead = (id: string) =>
     setNotifications((p) =>
@@ -119,28 +132,31 @@ export default function TenantNotificationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">แจ้งเตือน</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("notifications.title")}
+          </h1>
           <p className="text-muted-foreground">
-            {unread} รายการที่ยังไม่ได้อ่าน
+            {unread} {t("notifications.unread")}
           </p>
         </div>
         {unread > 0 && (
           <Button variant="outline" onClick={markAllRead}>
-            <CheckCircle2 className="w-4 h-4 mr-2" />{" "}
-            ทำเครื่องหมายว่าอ่านทั้งหมด
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            {t("notifications.markAll")}
           </Button>
         )}
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+          <Loader2 className="h-5 w-5 animate-spin" />
+          {t("common.loading")}
         </div>
       ) : notifications.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Bell className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
-            <p className="text-muted-foreground">ไม่มีการแจ้งเตือน</p>
+            <p className="text-muted-foreground">{t("notifications.empty")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -148,7 +164,11 @@ export default function TenantNotificationsPage() {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`flex gap-4 p-4 rounded-lg border transition-all ${n.isRead ? "bg-card/50 border-border" : "bg-primary/5 border-primary/30"}`}
+              className={`flex gap-4 p-4 rounded-lg border transition-all ${
+                n.isRead
+                  ? "bg-card/50 border-border"
+                  : "bg-primary/5 border-primary/30"
+              }`}
             >
               <div
                 className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${typeColors[n.type]}`}
@@ -160,7 +180,7 @@ export default function TenantNotificationsPage() {
                   {n.title}
                   {!n.isRead && (
                     <Badge variant="secondary" className="ml-2 text-xs">
-                      ใหม่
+                      {t("notifications.new")}
                     </Badge>
                   )}
                 </h3>

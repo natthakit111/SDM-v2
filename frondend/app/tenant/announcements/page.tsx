@@ -1,11 +1,13 @@
+//tenant/annnouncement/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Bell, Pin, Calendar, Loader2 } from "lucide-react";
 import { announcementAPI } from "@/lib/api/announcement.api";
+import { useLanguage } from "@/context/language-context";
 import { toast } from "sonner";
 
 interface Announcement {
@@ -20,6 +22,7 @@ interface Announcement {
 }
 
 export default function TenantAnnouncementsPage() {
+  const { t, language } = useLanguage();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,7 +31,7 @@ export default function TenantAnnouncementsPage() {
     announcementAPI
       .getAll()
       .then((r) => setAnnouncements(r.data ?? []))
-      .catch(() => toast.error("โหลดประกาศไม่สำเร็จ"))
+      .catch(() => toast.error(t("common.noData")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,7 +45,7 @@ export default function TenantAnnouncementsPage() {
   const others = filtered.filter((a) => a.is_pinned !== 1);
 
   const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("th-TH", {
+    new Date(d).toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -72,13 +75,13 @@ export default function TenantAnnouncementsPage() {
             </div>
             {ann.target_floor && (
               <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                ชั้น {ann.target_floor}
+                {t("announcements.floor")} {ann.target_floor}
               </span>
             )}
           </div>
           {isExpired(ann) && (
             <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded flex-shrink-0">
-              หมดอายุ
+              {t("status.expired")}
             </span>
           )}
         </div>
@@ -92,7 +95,11 @@ export default function TenantAnnouncementsPage() {
             <Calendar className="h-3 w-3" />
             {formatDate(ann.published_at)}
           </span>
-          {ann.expires_at && <span>หมดอายุ {formatDate(ann.expires_at)}</span>}
+          {ann.expires_at && (
+            <span>
+              {t("announcements.expires")} {formatDate(ann.expires_at)}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -101,9 +108,9 @@ export default function TenantAnnouncementsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">ประกาศ</h1>
+        <h1 className="text-3xl font-bold">{t("announcements.title")}</h1>
         <p className="text-muted-foreground mt-2">
-          อัพเดตข้อมูลและประกาศจากผู้จัดการหอพัก
+          {t("announcements.subtitle")}
         </p>
       </div>
 
@@ -112,7 +119,7 @@ export default function TenantAnnouncementsPage() {
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="ค้นหาประกาศ..."
+              placeholder={t("common.search") + "..."}
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -123,14 +130,16 @@ export default function TenantAnnouncementsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-          <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+          <Loader2 className="h-5 w-5 animate-spin" />
+          {t("common.loading")}
         </div>
       ) : (
         <>
           {pinned.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                <Pin className="h-4 w-4" /> ประกาศสำคัญ
+                <Pin className="h-4 w-4" />
+                {t("announcements.important")}
               </h2>
               {pinned.map((a) => (
                 <AnnouncementCard key={a.announcement_id} ann={a} highlight />
@@ -141,7 +150,8 @@ export default function TenantAnnouncementsPage() {
           {others.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                <Bell className="h-4 w-4" /> ประกาศอื่น
+                <Bell className="h-4 w-4" />
+                {t("announcements.others")}
               </h2>
               {others.map((a) => (
                 <AnnouncementCard key={a.announcement_id} ann={a} />
@@ -154,7 +164,7 @@ export default function TenantAnnouncementsPage() {
               <CardContent className="pt-10 text-center py-12">
                 <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                 <p className="text-muted-foreground">
-                  ไม่มีประกาศที่ตรงกับการค้นหา
+                  {t("announcements.empty")}
                 </p>
               </CardContent>
             </Card>

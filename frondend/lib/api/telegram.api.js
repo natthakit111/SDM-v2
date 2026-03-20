@@ -18,6 +18,17 @@ export const telegramAPI = {
   // returns: { linked: boolean, chat_id: string | null }
 
   // ── Admin only ────────────────────────────────────────────
+  // ✅ เพิ่ม: alias สำหรับ admin link/unlink
+  linkAdmin: (chat_id) =>
+    api.post('/telegram/link', { chat_id }).then((r) => r.data),
+
+  unlinkAdmin: () =>
+    api.delete('/telegram/unlink').then((r) => r.data),
+
+  // ✅ เพิ่ม: broadcast (alias ของ sendBroadcast)
+  broadcast: (message) =>
+    api.post('/telegram/broadcast', { message }).then((r) => r.data),
+
   sendBroadcast: (message) =>
     api.post('/telegram/broadcast', { message }).then((r) => r.data),
   // returns: { sent: number, total: number }

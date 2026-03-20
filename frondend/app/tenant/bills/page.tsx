@@ -1,3 +1,5 @@
+//tenant/bills/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,8 +31,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { billAPI } from "@/lib/api/bill.api";
-import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
+import { toast } from "sonner";
 
 interface MeterReading {
   reading_id: number;
@@ -54,25 +56,8 @@ interface Bill {
   due_date: string;
   status: "pending" | "paid" | "overdue" | "cancelled";
   room_number: string;
-  // detail จาก getById
   meter_readings?: MeterReading[];
 }
-
-const MONTHS = [
-  "",
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
-];
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("th-TH", {
@@ -81,13 +66,6 @@ const fmt = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 
-const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
 const imgUrl = (path: string | null) => {
   if (!path) return null;
   if (path.startsWith("http")) return path;
@@ -95,23 +73,28 @@ const imgUrl = (path: string | null) => {
 };
 
 export default function TenantBillsPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewingBill, setViewingBill] = useState<Bill | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
   useEffect(() => {
     billAPI
       .getMyBills()
       .then((r) => setBills(r.data ?? r ?? []))
-      .catch(() => toast.error("โหลดบิลไม่สำเร็จ"))
+      .catch(() => toast.error(t("common.noData")))
       .finally(() => setLoading(false));
   }, []);
 
-  // เปิด dialog พร้อม load รายละเอียด + รูปมิเตอร์
-  // backend ส่ง flat fields: elec_image, elec_current ฯลฯ
   const handleViewBill = async (bill: Bill) => {
     setViewingBill(bill);
     setDetailLoading(true);
@@ -119,7 +102,6 @@ export default function TenantBillsPage() {
       const res = await billAPI.getById(bill.bill_id);
       const detail = res?.data ?? res;
 
-      // แปลง flat fields → meter_readings array
       const meter_readings: MeterReading[] = [];
       if (detail.elec_current != null) {
         meter_readings.push({
@@ -165,33 +147,36 @@ export default function TenantBillsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">บิลของฉัน</h1>
-          <p className="text-muted-foreground">ดูรายละเอียดบิลค่าเช่าทั้งหมด</p>
+          <h1 className="text-2xl font-bold">{t("tenant.bills.title")}</h1>
+          <p className="text-muted-foreground">{t("tenant.bills.subtitle")}</p>
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="สถานะทั้งหมด" />
+            <SelectValue placeholder={t("common.all")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-            <SelectItem value="pending">รอชำระ</SelectItem>
-            <SelectItem value="paid">ชำระแล้ว</SelectItem>
-            <SelectItem value="overdue">เกินกำหนด</SelectItem>
+            <SelectItem value="all">{t("common.all")}</SelectItem>
+            <SelectItem value="pending">{t("status.pending")}</SelectItem>
+            <SelectItem value="paid">{t("status.paid")}</SelectItem>
+            <SelectItem value="overdue">{t("status.overdue")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
+      {/* Bill List */}
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-          <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+          <Loader2 className="h-5 w-5 animate-spin" />
+          {t("common.loading")}
         </div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>ไม่มีบิลที่ตรงกับการค้นหา</p>
+            <p>{t("common.noData")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -207,18 +192,30 @@ export default function TenantBillsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div
-                      className={`p-3 rounded-lg ${bill.status === "paid" ? "bg-green-500/20" : bill.status === "overdue" ? "bg-destructive/20" : "bg-yellow-500/20"}`}
+                      className={`p-3 rounded-lg ${
+                        bill.status === "paid"
+                          ? "bg-green-500/20"
+                          : bill.status === "overdue"
+                            ? "bg-destructive/20"
+                            : "bg-yellow-500/20"
+                      }`}
                     >
                       <Receipt
-                        className={`h-6 w-6 ${bill.status === "paid" ? "text-green-500" : bill.status === "overdue" ? "text-destructive" : "text-yellow-600"}`}
+                        className={`h-6 w-6 ${
+                          bill.status === "paid"
+                            ? "text-green-500"
+                            : bill.status === "overdue"
+                              ? "text-destructive"
+                              : "text-yellow-600"
+                        }`}
                       />
                     </div>
                     <div>
                       <p className="font-medium text-lg">
-                        {MONTHS[bill.bill_month]} {bill.bill_year}
+                        {t(`month.${bill.bill_month}`)} {bill.bill_year}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        กำหนดชำระ {fmtDate(bill.due_date)}
+                        {t("bills.dueDate")} {fmtDate(bill.due_date)}
                       </p>
                     </div>
                   </div>
@@ -235,41 +232,53 @@ export default function TenantBillsPage() {
                         size="sm"
                         onClick={() => handleViewBill(bill)}
                       >
-                        <FileText className="h-4 w-4 mr-1" /> รายละเอียด
+                        <FileText className="h-4 w-4 mr-1" />
+                        {t("common.view")}
                       </Button>
                       {(bill.status === "pending" ||
                         bill.status === "overdue") && (
                         <Link href={`/tenant/payment?bill=${bill.bill_id}`}>
                           <Button size="sm">
-                            <CreditCard className="h-4 w-4 mr-1" /> ชำระเงิน
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            {t("tenant.payNow")}
                           </Button>
                         </Link>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {/* Bill breakdown */}
                 <div className="mt-4 pt-4 border-t flex flex-wrap gap-4 text-sm">
                   <div className="flex items-center gap-1">
-                    <span className="text-muted-foreground">ค่าเช่า:</span>
+                    <span className="text-muted-foreground">
+                      {t("bills.rentAmount")}:
+                    </span>
                     <span className="font-medium">{fmt(bill.rent_amount)}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Zap className="h-4 w-4 text-yellow-500" />
-                    <span className="text-muted-foreground">ไฟฟ้า:</span>
+                    <span className="text-muted-foreground">
+                      {t("bills.electricAmount")}:
+                    </span>
                     <span className="font-medium">
                       {fmt(bill.electric_amount)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Droplets className="h-4 w-4 text-blue-500" />
-                    <span className="text-muted-foreground">น้ำ:</span>
+                    <span className="text-muted-foreground">
+                      {t("bills.waterAmount")}:
+                    </span>
                     <span className="font-medium">
                       {fmt(bill.water_amount)}
                     </span>
                   </div>
                   {bill.other_amount > 0 && (
                     <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground">อื่นๆ:</span>
+                      <span className="text-muted-foreground">
+                        {t("bills.otherAmount")}:
+                      </span>
                       <span className="font-medium">
                         {fmt(bill.other_amount)}
                       </span>
@@ -290,27 +299,32 @@ export default function TenantBillsPage() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" /> ใบแจ้งหนี้
+              <FileText className="h-5 w-5" />
+              {t("tenant.bills.invoice")}
             </DialogTitle>
           </DialogHeader>
           {viewingBill && (
             <div className="space-y-4">
+              {/* Room + Month */}
               <div className="flex justify-between items-center pb-4 border-b">
                 <div>
                   <p className="font-medium text-lg">
-                    ห้อง {viewingBill.room_number}
+                    {t("rooms.roomNumber")} {viewingBill.room_number}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {MONTHS[viewingBill.bill_month]} {viewingBill.bill_year}
+                    {t(`month.${viewingBill.bill_month}`)}{" "}
+                    {viewingBill.bill_year}
                   </p>
                 </div>
                 <BillStatusBadge status={viewingBill.status} />
               </div>
 
-              {/* รายละเอียดค่าใช้จ่าย */}
+              {/* Breakdown */}
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">ค่าเช่าห้อง</span>
+                  <span className="text-muted-foreground">
+                    {t("bills.rentAmount")}
+                  </span>
                   <span className="font-medium">
                     {fmt(viewingBill.rent_amount)}
                   </span>
@@ -318,12 +332,12 @@ export default function TenantBillsPage() {
                 <div className="flex justify-between">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Zap className="h-3 w-3 text-yellow-500" />
-                    ค่าไฟฟ้า
+                    {t("bills.electricAmount")}
                     {elecReading && (
                       <span className="text-xs text-muted-foreground ml-1">
                         ({elecReading.previous_unit} →{" "}
                         {elecReading.current_unit} = {elecReading.units_used}{" "}
-                        หน่วย × ฿{elecReading.rate_per_unit})
+                        {t("meters.used")} × ฿{elecReading.rate_per_unit})
                       </span>
                     )}
                   </span>
@@ -334,12 +348,12 @@ export default function TenantBillsPage() {
                 <div className="flex justify-between">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Droplets className="h-3 w-3 text-blue-500" />
-                    ค่าน้ำ
+                    {t("bills.waterAmount")}
                     {waterReading && (
                       <span className="text-xs text-muted-foreground ml-1">
                         ({waterReading.previous_unit} →{" "}
                         {waterReading.current_unit} = {waterReading.units_used}{" "}
-                        หน่วย × ฿{waterReading.rate_per_unit})
+                        {t("meters.used")} × ฿{waterReading.rate_per_unit})
                       </span>
                     )}
                   </span>
@@ -349,7 +363,9 @@ export default function TenantBillsPage() {
                 </div>
                 {viewingBill.other_amount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">ค่าอื่นๆ</span>
+                    <span className="text-muted-foreground">
+                      {t("bills.otherAmount")}
+                    </span>
                     <span className="font-medium">
                       {fmt(viewingBill.other_amount)}
                     </span>
@@ -357,18 +373,21 @@ export default function TenantBillsPage() {
                 )}
               </div>
 
+              {/* Total */}
               <div className="flex justify-between pt-4 border-t text-xl font-bold">
-                <span>รวมทั้งหมด</span>
+                <span>{t("common.total")}</span>
                 <span className="text-primary">
                   {fmt(viewingBill.total_amount)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">กำหนดชำระภายใน</span>
+                <span className="text-muted-foreground">
+                  {t("bills.dueDate")}
+                </span>
                 <span>{fmtDate(viewingBill.due_date)}</span>
               </div>
 
-              {/* รูปมิเตอร์ */}
+              {/* Meter Images */}
               {detailLoading ? (
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -377,14 +396,14 @@ export default function TenantBillsPage() {
                 <div className="pt-4 border-t space-y-3">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <Camera className="h-4 w-4" />
-                    รูปหลักฐานมิเตอร์
+                    {t("meters.image")}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
-                    {/* รูปมิเตอร์ไฟ */}
+                    {/* Electric meter image */}
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Zap className="h-3 w-3 text-yellow-500" />
-                        มิเตอร์ไฟฟ้า
+                        {t("meters.electric")}
                       </p>
                       {elecReading?.image_path ? (
                         <a
@@ -394,7 +413,7 @@ export default function TenantBillsPage() {
                         >
                           <img
                             src={imgUrl(elecReading.image_path) ?? ""}
-                            alt="มิเตอร์ไฟ"
+                            alt={t("meters.electric")}
                             className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                           />
                         </a>
@@ -402,16 +421,16 @@ export default function TenantBillsPage() {
                         <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
                           <div className="text-center text-muted-foreground">
                             <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                            <p className="text-xs">ไม่มีรูป</p>
+                            <p className="text-xs">{t("common.noData")}</p>
                           </div>
                         </div>
                       )}
                     </div>
-                    {/* รูปมิเตอร์น้ำ */}
+                    {/* Water meter image */}
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Droplets className="h-3 w-3 text-blue-500" />
-                        มิเตอร์น้ำ
+                        {t("meters.water")}
                       </p>
                       {waterReading?.image_path ? (
                         <a
@@ -421,7 +440,7 @@ export default function TenantBillsPage() {
                         >
                           <img
                             src={imgUrl(waterReading.image_path) ?? ""}
-                            alt="มิเตอร์น้ำ"
+                            alt={t("meters.water")}
                             className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                           />
                         </a>
@@ -429,7 +448,7 @@ export default function TenantBillsPage() {
                         <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
                           <div className="text-center text-muted-foreground">
                             <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                            <p className="text-xs">ไม่มีรูป</p>
+                            <p className="text-xs">{t("common.noData")}</p>
                           </div>
                         </div>
                       )}
@@ -438,6 +457,7 @@ export default function TenantBillsPage() {
                 </div>
               ) : null}
 
+              {/* Pay button */}
               {(viewingBill.status === "pending" ||
                 viewingBill.status === "overdue") && (
                 <Link
@@ -446,7 +466,7 @@ export default function TenantBillsPage() {
                 >
                   <Button className="w-full mt-2">
                     <CreditCard className="h-4 w-4 mr-2" />
-                    ชำระเงิน
+                    {t("tenant.payNow")}
                   </Button>
                 </Link>
               )}

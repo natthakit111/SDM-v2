@@ -2,10 +2,11 @@
  * routes/auth.routes.js
  * Base path: /api/auth
  *
- * Public:    POST /register   — create new account
- *            POST /login      — get JWT
- * Protected: GET  /me         — current user info
- *            PUT  /change-password
+ * Public:    POST /register        — create new account
+ *            POST /login           — get JWT
+ * Protected: GET  /me              — current user info
+ *            PUT  /profile         — update profile info
+ *            PUT  /change-password — change password
  */
 
 const express = require('express');
@@ -40,6 +41,13 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+const updateProfileValidation = [
+  body('firstName').optional().trim().isLength({ max: 100 }).withMessage('First name too long'),
+  body('lastName').optional().trim().isLength({ max: 100 }).withMessage('Last name too long'),
+  body('email').optional({ nullable: true }).trim().isEmail().withMessage('Invalid email format'),
+  body('phone').optional({ nullable: true }).trim().isLength({ max: 20 }).withMessage('Phone too long'),
+];
+
 const changePasswordValidation = [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword')
@@ -51,11 +59,9 @@ const changePasswordValidation = [
 
 /**
  * POST /api/auth/register
- * Public endpoint — but creating an admin account requires an existing admin JWT.
- * If role='admin' is in the body, the route enforces authenticate + authorizeRoles('admin').
+ * Public — but creating an admin account requires existing admin JWT.
  */
 router.post('/register', registerValidation, (req, res, next) => {
-  // If registering as admin, require existing admin token
   if (req.body.role === 'admin') {
     return authenticate(req, res, () => {
       authorizeRoles('admin')(req, res, () => {
@@ -63,31 +69,28 @@ router.post('/register', registerValidation, (req, res, next) => {
       });
     });
   }
-  // Regular tenant self-registration — no token required
   authController.register(req, res, next);
 });
 
 /**
  * POST /api/auth/login
- * Returns a signed JWT on valid credentials.
  */
 router.post('/login', loginValidation, authController.login);
 
 /**
  * GET /api/auth/me
- * Returns the currently authenticated user's profile.
  */
 router.get('/me', authenticate, authController.getMe);
 
 /**
- * PUT /api/auth/change-password
- * Allows any authenticated user to change their own password.
+ * PUT /api/auth/profile  ✅ เพิ่มใหม่
+ * อัปเดตข้อมูลโปรไฟล์ (ชื่อ, อีเมล, เบอร์)
  */
-router.put(
-  '/change-password',
-  authenticate,
-  changePasswordValidation,
-  authController.changePassword
-);
+router.put('/profile', authenticate, updateProfileValidation, authController.updateProfile);
+
+/**
+ * PUT /api/auth/change-password
+ */
+router.put('/change-password', authenticate, changePasswordValidation, authController.changePassword);
 
 module.exports = router;

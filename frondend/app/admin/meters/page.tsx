@@ -1,3 +1,5 @@
+//meters/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -51,21 +53,9 @@ import { meterAPI } from "@/lib/api/meter.api";
 import { roomAPI } from "@/lib/api/room.api";
 import { utilityRateAPI } from "@/lib/api/utilityRate.api";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/language-context";
 
-const MONTHS = [
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
-];
+// Month names are generated from t("month.N") inside the component
 
 interface Room {
   room_id: number;
@@ -115,6 +105,8 @@ const formatDate = (d: string) =>
 const now = new Date();
 
 export default function MetersPage() {
+  const { t } = useLanguage();
+  const MONTHS = Array.from({ length: 12 }, (_, i) => t(`month.${i + 1}`));
   const [readings, setReadings] = useState<Reading[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [rates, setRates] = useState<{ electric: number; water: number }>({
@@ -168,7 +160,7 @@ export default function MetersPage() {
         water: Number(rd.water?.rate_per_unit ?? 0),
       });
     } catch {
-      toast.error("โหลดข้อมูลไม่สำเร็จ");
+      toast.error(t("meters.loadError"));
     } finally {
       setLoading(false);
     }
@@ -287,11 +279,11 @@ export default function MetersPage() {
 
   const handleSubmit = async () => {
     if (!roomId) {
-      toast.error("กรุณาเลือกห้อง");
+      toast.error(t("meters.errorSelectRoom"));
       return;
     }
     if (!elecCurr && !waterCurr) {
-      toast.error("กรุณากรอกค่ามิเตอร์อย่างน้อย 1 ประเภท");
+      toast.error(t("meters.errorAtLeastOne"));
       return;
     }
 
@@ -299,9 +291,9 @@ export default function MetersPage() {
     const errors: string[] = [];
 
     if (elecCurr && Number(elecCurr) < Number(elecPrev))
-      errors.push("ไฟฟ้า: ค่าปัจจุบันต้องมากกว่าก่อนหน้า");
+      errors.push(t("meters.errorElecOrder"));
     if (waterCurr && Number(waterCurr) < Number(waterPrev))
-      errors.push("น้ำ: ค่าปัจจุบันต้องมากกว่าก่อนหน้า");
+      errors.push(t("meters.errorWaterOrder"));
     if (errors.length) {
       toast.error(errors.join(" | "));
       return;
@@ -351,12 +343,12 @@ export default function MetersPage() {
       }
 
       toast.success(
-        isEditing ? "อัปเดตมิเตอร์เรียบร้อย" : "บันทึกมิเตอร์เรียบร้อย",
+        isEditing ? t("meters.updateSuccess") : t("meters.saveSuccess"),
       );
       resetDialog();
       fetchAll();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "เกิดข้อผิดพลาด");
+      toast.error(err?.response?.data?.message ?? t("meters.saveError"));
     } finally {
       setSubmitting(false);
     }
@@ -370,14 +362,12 @@ export default function MetersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">บันทึกมิเตอร์</h1>
-          <p className="text-muted-foreground">
-            บันทึกค่ามิเตอร์ไฟฟ้าและน้ำประปา
-          </p>
+          <h1 className="text-2xl font-bold">{t("meters.title")}</h1>
+          <p className="text-muted-foreground">{t("meters.subtitle")}</p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          บันทึกมิเตอร์
+          {t("meters.addBtn")}
         </Button>
       </div>
 
@@ -388,7 +378,7 @@ export default function MetersPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ค้นหาหมายเลขห้อง..."
+                placeholder={t("meters.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -396,10 +386,10 @@ export default function MetersPage() {
             </div>
             <Select value={monthFilter} onValueChange={setMonthFilter}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="เดือนทั้งหมด" />
+                <SelectValue placeholder={t("meters.allMonths")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">เดือนทั้งหมด</SelectItem>
+                <SelectItem value="all">{t("meters.allMonths")}</SelectItem>
                 {MONTHS.map((m, i) => (
                   <SelectItem key={i + 1} value={String(i + 1)}>
                     {m}
@@ -416,9 +406,11 @@ export default function MetersPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Gauge className="h-5 w-5" />
-            รายการมิเตอร์
+            {t("meters.listTitle")}
           </CardTitle>
-          <CardDescription>ทั้งหมด {filtered.length} รายการ</CardDescription>
+          <CardDescription>
+            {t("meters.totalItems").replace("{n}", String(filtered.length))}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -429,22 +421,24 @@ export default function MetersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ห้อง</TableHead>
-                  <TableHead>เดือน/ปี</TableHead>
+                  <TableHead>{t("meters.colRoom")}</TableHead>
+                  <TableHead>{t("meters.colMonthYear")}</TableHead>
                   <TableHead className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Zap className="h-4 w-4 text-yellow-500" />
-                      ไฟฟ้า (หน่วย)
+                      {t("meters.colElectric")}
                     </div>
                   </TableHead>
                   <TableHead className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Droplets className="h-4 w-4 text-blue-500" />
-                      น้ำ (หน่วย)
+                      {t("meters.colWater")}
                     </div>
                   </TableHead>
-                  <TableHead>บันทึกเมื่อ</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead>{t("meters.colRecordedAt")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -505,7 +499,7 @@ export default function MetersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="ดูรูปภาพ"
+                          title={t("meters.viewPhotos")}
                           onClick={() => {
                             setViewingGroup(g);
                             setPhotoDialogOpen(true);
@@ -530,7 +524,7 @@ export default function MetersPage() {
                       colSpan={6}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      ไม่พบรายการมิเตอร์
+                      {t("meters.notFound")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -551,26 +545,24 @@ export default function MetersPage() {
           <DialogHeader>
             <DialogTitle>
               {editingElectric || editingWater
-                ? "แก้ไขมิเตอร์"
-                : "บันทึกมิเตอร์ใหม่"}
+                ? t("meters.editTitle")
+                : t("meters.addTitle")}
             </DialogTitle>
-            <DialogDescription>
-              กรอกค่ามิเตอร์ไฟฟ้าและน้ำประปา
-            </DialogDescription>
+            <DialogDescription>{t("meters.dialogDesc")}</DialogDescription>
           </DialogHeader>
 
           <FieldGroup>
             {/* Room / Month / Year */}
             <div className="grid grid-cols-3 gap-4">
               <Field className="col-span-1">
-                <FieldLabel>ห้อง</FieldLabel>
+                <FieldLabel>{t("contracts.room")}</FieldLabel>
                 <Select
                   value={roomId}
                   onValueChange={handleRoomChange}
                   disabled={!!(editingElectric || editingWater)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="เลือกห้อง" />
+                    <SelectValue placeholder={t("contracts.selectRoom")} />
                   </SelectTrigger>
                   <SelectContent>
                     {rooms.map((r) => (
@@ -582,7 +574,7 @@ export default function MetersPage() {
                 </Select>
               </Field>
               <Field>
-                <FieldLabel>เดือน</FieldLabel>
+                <FieldLabel>{t("bills.month")}</FieldLabel>
                 <Select
                   value={month}
                   onValueChange={setMonth}
@@ -601,7 +593,7 @@ export default function MetersPage() {
                 </Select>
               </Field>
               <Field>
-                <FieldLabel>ปี</FieldLabel>
+                <FieldLabel>{t("bills.year")}</FieldLabel>
                 <Select
                   value={year}
                   onValueChange={setYear}
@@ -625,9 +617,10 @@ export default function MetersPage() {
             <div className="p-4 bg-muted/50 rounded-lg space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Zap className="h-4 w-4 text-yellow-500" />
-                มิเตอร์ไฟฟ้า
+                {t("meters.electricMeter")}
                 <span className="text-muted-foreground ml-auto text-xs">
-                  (อัตรา {rates.electric} บาท/หน่วย)
+                  ({t("meters.rate")} {rates.electric} {t("meters.bahtPerUnit")}
+                  )
                 </span>
                 {(elecImage || elecPreview) && (
                   <CheckCircle className="h-4 w-4 text-green-500" />
@@ -635,7 +628,7 @@ export default function MetersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>เลขก่อนหน้า</FieldLabel>
+                  <FieldLabel>{t("meters.previousUnit")}</FieldLabel>
                   <Input
                     type="number"
                     value={elecPrev}
@@ -644,7 +637,7 @@ export default function MetersPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel>เลขปัจจุบัน</FieldLabel>
+                  <FieldLabel>{t("meters.currentUnit")}</FieldLabel>
                   <Input
                     type="number"
                     value={elecCurr}
@@ -655,7 +648,7 @@ export default function MetersPage() {
               </div>
               {/* รูปมิเตอร์ไฟ */}
               <div className="space-y-2">
-                <FieldLabel>รูปมิเตอร์ไฟฟ้า (ไม่บังคับ)</FieldLabel>
+                <FieldLabel>{t("meters.elecPhotoLabel")}</FieldLabel>
                 <input
                   ref={elecRef}
                   type="file"
@@ -667,7 +660,7 @@ export default function MetersPage() {
                   <div className="relative">
                     <img
                       src={elecPreview}
-                      alt="มิเตอร์ไฟ"
+                      alt={t("meters.electricMeter")}
                       className="w-full h-32 object-cover rounded-lg"
                     />
                     <Button
@@ -690,7 +683,7 @@ export default function MetersPage() {
                     onClick={() => elecRef.current?.click()}
                   >
                     <Camera className="h-4 w-4" />
-                    อัปโหลดรูปมิเตอร์ไฟฟ้า
+                    {t("meters.uploadElecPhoto")}
                   </Button>
                 )}
               </div>
@@ -700,9 +693,9 @@ export default function MetersPage() {
             <div className="p-4 bg-muted/50 rounded-lg space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Droplets className="h-4 w-4 text-blue-500" />
-                มิเตอร์น้ำ
+                {t("meters.waterMeter")}
                 <span className="text-muted-foreground ml-auto text-xs">
-                  (อัตรา {rates.water} บาท/หน่วย)
+                  ({t("meters.rate")} {rates.water} {t("meters.bahtPerUnit")})
                 </span>
                 {(waterImage || waterPreview) && (
                   <CheckCircle className="h-4 w-4 text-green-500" />
@@ -710,7 +703,7 @@ export default function MetersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>เลขก่อนหน้า</FieldLabel>
+                  <FieldLabel>{t("meters.previousUnit")}</FieldLabel>
                   <Input
                     type="number"
                     value={waterPrev}
@@ -719,7 +712,7 @@ export default function MetersPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel>เลขปัจจุบัน</FieldLabel>
+                  <FieldLabel>{t("meters.currentUnit")}</FieldLabel>
                   <Input
                     type="number"
                     value={waterCurr}
@@ -730,7 +723,7 @@ export default function MetersPage() {
               </div>
               {/* รูปมิเตอร์น้ำ */}
               <div className="space-y-2">
-                <FieldLabel>รูปมิเตอร์น้ำ (ไม่บังคับ)</FieldLabel>
+                <FieldLabel>{t("meters.waterPhotoLabel")}</FieldLabel>
                 <input
                   ref={waterRef}
                   type="file"
@@ -742,7 +735,7 @@ export default function MetersPage() {
                   <div className="relative">
                     <img
                       src={waterPreview}
-                      alt="มิเตอร์น้ำ"
+                      alt={t("meters.waterMeter")}
                       className="w-full h-32 object-cover rounded-lg"
                     />
                     <Button
@@ -765,7 +758,7 @@ export default function MetersPage() {
                     onClick={() => waterRef.current?.click()}
                   >
                     <Camera className="h-4 w-4" />
-                    อัปโหลดรูปมิเตอร์น้ำ
+                    {t("meters.uploadWaterPhoto")}
                   </Button>
                 )}
               </div>
@@ -774,11 +767,13 @@ export default function MetersPage() {
 
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={resetDialog}>
-              ยกเลิก
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSubmit} disabled={submitting}>
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingElectric || editingWater ? "บันทึก" : "บันทึกมิเตอร์"}
+              {editingElectric || editingWater
+                ? t("common.save")
+                : t("meters.addBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -789,7 +784,7 @@ export default function MetersPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              รูปมิเตอร์ห้อง {viewingGroup?.room_number} —{" "}
+              {t("meters.photoDialogTitle")} {viewingGroup?.room_number} —{" "}
               {viewingGroup && MONTHS[viewingGroup.reading_month - 1]}{" "}
               {viewingGroup?.reading_year}
             </DialogTitle>
@@ -799,19 +794,19 @@ export default function MetersPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Zap className="h-4 w-4 text-yellow-500" />
-                  มิเตอร์ไฟฟ้า
+                  {t("meters.electricMeter")}
                 </div>
                 {viewingGroup.electric?.image_path ? (
                   <img
                     src={imgUrl(viewingGroup.electric.image_path) ?? ""}
-                    alt="มิเตอร์ไฟ"
+                    alt={t("meters.electricMeter")}
                     className="w-full rounded-lg object-contain max-h-64 bg-muted"
                   />
                 ) : (
                   <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
                     <div className="text-center text-muted-foreground">
                       <ImageIcon className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                      <p className="text-xs">ไม่มีรูป</p>
+                      <p className="text-xs">{t("meters.noPhoto")}</p>
                     </div>
                   </div>
                 )}
@@ -819,19 +814,19 @@ export default function MetersPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Droplets className="h-4 w-4 text-blue-500" />
-                  มิเตอร์น้ำ
+                  {t("meters.waterMeter")}
                 </div>
                 {viewingGroup.water?.image_path ? (
                   <img
                     src={imgUrl(viewingGroup.water.image_path) ?? ""}
-                    alt="มิเตอร์น้ำ"
+                    alt={t("meters.waterMeter")}
                     className="w-full rounded-lg object-contain max-h-64 bg-muted"
                   />
                 ) : (
                   <div className="flex items-center justify-center h-32 bg-muted rounded-lg">
                     <div className="text-center text-muted-foreground">
                       <ImageIcon className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                      <p className="text-xs">ไม่มีรูป</p>
+                      <p className="text-xs">{t("meters.noPhoto")}</p>
                     </div>
                   </div>
                 )}

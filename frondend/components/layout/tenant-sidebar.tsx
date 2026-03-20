@@ -1,7 +1,8 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useLanguage } from "@/context/language-context";
 import {
   Sidebar,
   SidebarContent,
@@ -12,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
-} from '@/components/ui/sidebar'
+} from "@/components/ui/sidebar";
 import {
   Building2,
   LayoutDashboard,
@@ -23,37 +24,67 @@ import {
   FileText,
   History,
   LogOut,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-const menuItems = [
-  {
-    group: 'หลัก',
-    items: [
-      { title: 'หน้าหลัก', href: '/tenant', icon: LayoutDashboard },
-    ],
-  },
-  {
-    group: 'การเงิน',
-    items: [
-      { title: 'บิลของฉัน', href: '/tenant/bills', icon: Receipt },
-      { title: 'ชำระเงิน', href: '/tenant/payment', icon: CreditCard },
-      { title: 'ประวัติการชำระ', href: '/tenant/payment-history', icon: History },
-    ],
-  },
-  {
-    group: 'บริการ',
-    items: [
-      { title: 'แจ้งซ่อม', href: '/tenant/maintenance', icon: Wrench },
-      { title: 'ประกาศ', href: '/tenant/announcements', icon: Bell },
-      { title: 'สัญญาเช่า', href: '/tenant/contract', icon: FileText },
-      { title: 'ขอย้ายออก', href: '/tenant/move-out', icon: LogOut },
-    ],
-  },
-]
+  Languages,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function TenantSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
+  const { t, language, setLanguage } = useLanguage();
+
+  const menuItems = [
+    {
+      group: t("menu.group.main"),
+      items: [
+        { title: t("menu.dashboard"), href: "/tenant", icon: LayoutDashboard },
+      ],
+    },
+    {
+      group: t("menu.group.finance"),
+      items: [
+        {
+          title: t("tenant.bills.title"),
+          href: "/tenant/bills",
+          icon: Receipt,
+        },
+        {
+          title: t("tenant.payment.title"),
+          href: "/tenant/payment",
+          icon: CreditCard,
+        },
+        {
+          title: t("payments.history"),
+          href: "/tenant/payment-history",
+          icon: History,
+        },
+      ],
+    },
+    {
+      group: t("menu.group.other"),
+      items: [
+        {
+          title: t("maintenance.title"),
+          href: "/tenant/maintenance",
+          icon: Wrench,
+        },
+        {
+          title: t("announcements.title"),
+          href: "/tenant/announcements",
+          icon: Bell,
+        },
+        {
+          title: t("tenant.contract.title"),
+          href: "/tenant/contract",
+          icon: FileText,
+        },
+        {
+          title: t("tenant.moveout.title"),
+          href: "/tenant/move-out",
+          icon: LogOut,
+        },
+      ],
+    },
+  ];
 
   return (
     <Sidebar>
@@ -64,27 +95,28 @@ export function TenantSidebar() {
           </div>
           <div>
             <h1 className="font-bold text-lg">DormFlow</h1>
-            <p className="text-xs text-muted-foreground">ผู้เช่า</p>
+            <p className="text-xs text-muted-foreground">
+              {t("common.tenant")}
+            </p>
           </div>
         </Link>
       </SidebarHeader>
+
       <SidebarContent>
         {menuItems.map((group) => (
           <SidebarGroup key={group.group}>
             <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
             <SidebarMenu>
               {group.items.map((item) => {
-                const isActive = pathname === item.href || 
-                  (item.href !== '/tenant' && pathname.startsWith(item.href))
-                
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/tenant" && pathname.startsWith(item.href));
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className={cn(
-                        isActive && 'bg-primary/20 text-primary'
-                      )}
+                      className={cn(isActive && "bg-primary/20 text-primary")}
                     >
                       <Link href={item.href}>
                         <item.icon className="h-4 w-4" />
@@ -92,17 +124,50 @@ export function TenantSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )
+                );
               })}
             </SidebarMenu>
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="text-xs text-muted-foreground text-center">
-          หอพักสุขใจ
-        </div>
+
+      <SidebarFooter className="border-t border-sidebar-border">
+        <SidebarMenu>
+          {/* ✅ Language Toggle */}
+          <SidebarMenuItem>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <Languages className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm text-muted-foreground flex-1">
+                {t("common.language")}
+              </span>
+              <div className="flex rounded-md border border-border overflow-hidden text-xs font-medium">
+                <button
+                  onClick={() => setLanguage("th")}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors",
+                    language === "th"
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground",
+                  )}
+                >
+                  TH
+                </button>
+                <button
+                  onClick={() => setLanguage("en")}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors border-l border-border",
+                    language === "en"
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground",
+                  )}
+                >
+                  EN
+                </button>
+              </div>
+            </div>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
