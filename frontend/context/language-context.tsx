@@ -1222,7 +1222,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 export function useLanguage() {
   const context = useContext(LanguageContext);
-  if (!context)
-    throw new Error("useLanguage must be used within LanguageProvider");
+  if (!context) {
+    // ✅ return default แทน throw — ป้องกัน prerender crash
+    return {
+      language: "th" as const,
+      setLanguage: (_lang: "th" | "en") => {},
+      t: (key: string) => key,
+    };
+  }
   return context;
 }
