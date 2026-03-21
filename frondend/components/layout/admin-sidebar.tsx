@@ -86,7 +86,8 @@ export function AdminSidebar() {
   ];
 
   return (
-    <Sidebar>
+    // ✅ เพิ่ม collapsible="offcanvas" → บนมือถือ sidebar จะ slide in/out แทนที่จะทับ content
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link href="/admin" className="flex items-center gap-3 px-4 py-3">
           <div className="p-2 rounded-lg bg-primary/20">
@@ -164,7 +165,7 @@ export function AdminSidebar() {
             </div>
           </SidebarMenuItem>
 
-          {/* ✅ Profile */}
+          {/* Profile */}
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

@@ -1,111 +1,129 @@
 /**
- * controllers/paymentController.js (Phase 5 — Telegram wired in)
+ * controllers/meterController.js
+ * Admin records monthly water/electric meter readings per room.
+ * Optionally uploads a meter photo for evidence.
  */
 
 const { validationResult } = require('express-validator');
-const PaymentModel    = require('../models/payment.model');
-const BillModel       = require('../models/bill.model');
-const TenantModel     = require('../models/tenant.model');
-const TelegramService = require('../services/telegram.service');
-const { sendSuccess, sendCreated, sendBadRequest, sendNotFound, sendForbidden } = require('../utils/response');
+const MeterModel       = require('../models/meter.model');
+const UtilityRateModel = require('../models/utilityRate.model');
+const ContractModel    = require('../models/contract.model');
+const { sendSuccess, sendCreated, sendBadRequest, sendNotFound } = require('../utils/response');
 
-const getAllPayments = async (req, res, next) => {
+// GET /api/meters?room_id=&meter_type=&month=&year=
+const getAllReadings = async (req, res, next) => {
   try {
-    const { tenant_id, bill_id, status } = req.query;
-    const payments = await PaymentModel.findAll({ tenant_id, bill_id, status });
-    return sendSuccess(res, payments);
+    const { room_id, meter_type, month, year } = req.query;
+    const readings = await MeterModel.findAll({ room_id, meter_type, month, year });
+    return sendSuccess(res, readings);
   } catch (err) { next(err); }
 };
 
-const getMyPayments = async (req, res, next) => {
+// GET /api/meters/:id
+const getReadingById = async (req, res, next) => {
   try {
-    const tenant = await TenantModel.findByUserId(req.user.user_id);
-    if (!tenant) return sendNotFound(res, 'Tenant profile not found');
-    const payments = await PaymentModel.findAll({ tenant_id: tenant.tenant_id });
-    return sendSuccess(res, payments);
+    const reading = await MeterModel.findById(req.params.id);
+    if (!reading) return sendNotFound(res, 'Meter reading not found');
+    return sendSuccess(res, reading);
   } catch (err) { next(err); }
 };
 
-const getPaymentById = async (req, res, next) => {
+// GET /api/meters/rooms/:roomId/previous?type=electric
+const getPreviousReading = async (req, res, next) => {
   try {
-    const payment = await PaymentModel.findById(req.params.id);
-    if (!payment) return sendNotFound(res, 'Payment not found');
-    if (req.user.role === 'tenant') {
-      const tenant = await TenantModel.findByUserId(req.user.user_id);
-      if (!tenant || tenant.tenant_id !== payment.tenant_id) return sendForbidden(res, 'Access denied');
-    }
-    return sendSuccess(res, payment);
+    const { roomId } = req.params;
+    const meterType  = req.query.type || 'electric';
+    const latest = await MeterModel.findLatestByRoomAndType(roomId, meterType);
+    return sendSuccess(res, {
+      previous_unit: latest ? parseFloat(latest.current_unit) : 0,
+      last_recorded: latest ? `${latest.reading_month}/${latest.reading_year}` : null,
+    });
   } catch (err) { next(err); }
 };
 
-const submitPayment = async (req, res, next) => {
+// POST /api/meters
+const createReading = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendBadRequest(res, 'Validation failed', errors.array());
 
-    const { bill_id, payment_method } = req.body;
-    const bill = await BillModel.findById(bill_id);
-    if (!bill)                   return sendNotFound(res, 'Bill not found');
-    if (bill.status === 'paid')  return sendBadRequest(res, 'This bill has already been paid');
-    if (bill.status === 'cancelled') return sendBadRequest(res, 'This bill is cancelled');
+    const { room_id, meter_type, reading_month, reading_year, current_unit, other_amount } = req.body;
+    let { rate_per_unit } = req.body;
 
-    const tenant = await TenantModel.findByUserId(req.user.user_id);
-    if (!tenant) return sendNotFound(res, 'Tenant profile not found');
-    if (tenant.tenant_id !== bill.tenant_id) return sendForbidden(res, 'This bill does not belong to you');
+    const activeContract = await ContractModel.findActiveByRoom(room_id);
+    if (!activeContract) {
+      return sendBadRequest(res, `Room ${room_id} has no active contract — cannot record meter`);
+    }
 
-    const existingPayments = await PaymentModel.findByBillId(bill_id);
-    const hasPending = existingPayments.some(p => p.status === 'pending_verify');
-    if (hasPending) return sendBadRequest(res, 'A payment for this bill is already pending verification');
+    const duplicate = await MeterModel.findByRoomMonthYear(room_id, meter_type, reading_month, reading_year);
+    if (duplicate) {
+      return sendBadRequest(
+        res,
+        `A ${meter_type} reading for room ${room_id} in ${reading_month}/${reading_year} already exists. Use PUT to update.`
+      );
+    }
 
-    const slip_image = req.file ? req.file.path.replace(/\\/g, '/') : null;
-    const paymentId = await PaymentModel.create({
-      bill_id: parseInt(bill_id), tenant_id: tenant.tenant_id,
-      amount_paid: bill.total_amount, payment_method: payment_method || 'qr_promptpay', slip_image,
+    if (!rate_per_unit) {
+      const currentRate = await UtilityRateModel.getCurrentRate(meter_type);
+      if (!currentRate) {
+        return sendBadRequest(res, `No ${meter_type} rate configured. Please set a rate in Utility Rates first.`);
+      }
+      rate_per_unit = currentRate.rate_per_unit;
+    }
+
+    const previousReading = await MeterModel.findLatestByRoomAndType(room_id, meter_type);
+    const previous_unit = previousReading ? parseFloat(previousReading.current_unit) : 0;
+
+    if (parseFloat(current_unit) < previous_unit) {
+      return sendBadRequest(
+        res,
+        `Current unit (${current_unit}) cannot be less than previous unit (${previous_unit})`
+      );
+    }
+
+    // ✅ Cloudinary: req.file.path คือ URL เต็ม ไม่ต้อง replace backslash
+    const image_path = req.file ? req.file.path : null;
+
+    const readingId = await MeterModel.create({
+      room_id, meter_type,
+      reading_month: parseInt(reading_month),
+      reading_year:  parseInt(reading_year),
+      previous_unit,
+      current_unit:  parseFloat(current_unit),
+      rate_per_unit: parseFloat(rate_per_unit),
+      image_path,
+      recorded_by: req.user.user_id,
     });
 
-    const newPayment = await PaymentModel.findById(paymentId);
-
-    // ✅ Phase 5: Notify admin via Telegram
-    TelegramService.notifyAdminNewPayment(newPayment).catch(() => {});
-
-    return sendCreated(res, newPayment, 'Payment submitted successfully. Awaiting admin verification.');
+    const created = await MeterModel.findById(readingId);
+    return sendCreated(res, created, 'Meter reading recorded successfully');
   } catch (err) { next(err); }
 };
 
-const verifyPayment = async (req, res, next) => {
+// PUT /api/meters/:id
+const updateReading = async (req, res, next) => {
   try {
-    const payment = await PaymentModel.findById(req.params.id);
-    if (!payment) return sendNotFound(res, 'Payment not found');
-    if (payment.status !== 'pending_verify') return sendBadRequest(res, `Payment is already '${payment.status}'`);
+    const reading = await MeterModel.findById(req.params.id);
+    if (!reading) return sendNotFound(res, 'Meter reading not found');
 
-    await PaymentModel.verify(req.params.id, req.user.user_id, 'verified', req.body.remark || null);
-    await BillModel.updateStatus(payment.bill_id, 'paid');
-    const updated = await PaymentModel.findById(req.params.id);
+    const { current_unit, rate_per_unit } = req.body;
+    // ✅ Cloudinary: req.file.path คือ URL เต็ม ไม่ต้อง replace backslash
+    const image_path = req.file ? req.file.path : undefined;
 
-    // ✅ Phase 5: Notify tenant via Telegram
-    TelegramService.sendPaymentConfirmation(updated).catch(() => {});
+    const updates = {};
+    if (current_unit !== undefined) {
+      if (parseFloat(current_unit) < parseFloat(reading.previous_unit)) {
+        return sendBadRequest(res, `Current unit cannot be less than previous unit (${reading.previous_unit})`);
+      }
+      updates.current_unit = parseFloat(current_unit);
+    }
+    if (rate_per_unit !== undefined) updates.rate_per_unit = parseFloat(rate_per_unit);
+    if (image_path    !== undefined) updates.image_path = image_path;
 
-    return sendSuccess(res, updated, 'Payment verified — bill marked as paid');
+    await MeterModel.update(req.params.id, updates);
+    const updated = await MeterModel.findById(req.params.id);
+    return sendSuccess(res, updated, 'Meter reading updated successfully');
   } catch (err) { next(err); }
 };
 
-const rejectPayment = async (req, res, next) => {
-  try {
-    const { remark } = req.body;
-    if (!remark) return sendBadRequest(res, 'A remark/reason is required when rejecting a payment');
-
-    const payment = await PaymentModel.findById(req.params.id);
-    if (!payment) return sendNotFound(res, 'Payment not found');
-    if (payment.status !== 'pending_verify') return sendBadRequest(res, `Payment is already '${payment.status}'`);
-
-    await PaymentModel.verify(req.params.id, req.user.user_id, 'rejected', remark);
-    const updated = await PaymentModel.findById(req.params.id);
-
-    // ✅ Phase 5: Notify tenant of rejection via Telegram
-    TelegramService.sendPaymentRejected(updated).catch(() => {});
-
-    return sendSuccess(res, updated, 'Payment rejected. Tenant will be notified.');
-  } catch (err) { next(err); }
-};
-
-module.exports = { getAllPayments, getMyPayments, getPaymentById, submitPayment, verifyPayment, rejectPayment };
+module.exports = { getAllReadings, getReadingById, getPreviousReading, createReading, updateReading };

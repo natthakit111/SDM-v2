@@ -1,57 +1,66 @@
 /**
  * middlewares/upload.middleware.js
- * Multer configuration for file uploads.
- * Supports: meter images, payment slips, contract PDFs, profile images.
+ * Multer + Cloudinary — รูปและ PDF เก็บบน cloud ไม่หายเมื่อ redeploy
+ *
+ * ต้องติดตั้ง:
+ *   npm install cloudinary multer-storage-cloudinary
+ *
+ * env vars ที่ต้องใส่ใน Railway:
+ *   CLOUDINARY_CLOUD_NAME=xxx
+ *   CLOUDINARY_API_KEY=xxx
+ *   CLOUDINARY_API_SECRET=xxx
  */
 
-const multer = require('multer');
-const path   = require('path');
-const fs     = require('fs');
+const multer               = require('multer');
+const cloudinary           = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+// ── Config Cloudinary ────────────────────────────────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const MAX_SIZE_BYTES = (parseInt(process.env.MAX_FILE_SIZE_MB) || 5) * 1024 * 1024;
 
-// Ensure upload directories exist
-const ensureDir = (dir) => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+// ── Map fieldname → Cloudinary folder + allowed formats ─────────────────────
+const FIELD_CONFIG = {
+  meter_image:   { folder: 'dormflow/meter-images',   resource_type: 'image', formats: ['jpg','jpeg','png','webp'] },
+  payment_slip:  { folder: 'dormflow/payment-slips',  resource_type: 'image', formats: ['jpg','jpeg','png','webp'] },
+  contract_file: { folder: 'dormflow/contracts',      resource_type: 'raw',   formats: ['pdf'] },
+  profile_image: { folder: 'dormflow/profiles',       resource_type: 'image', formats: ['jpg','jpeg','png','webp'] },
 };
 
-// Dynamic storage: destination folder determined by fieldname
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    let folder = 'misc';
-    if (file.fieldname === 'meter_image')   folder = 'meter-images';
-    if (file.fieldname === 'payment_slip')  folder = 'payment-slips';
-    if (file.fieldname === 'contract_file') folder = 'contracts';
-    if (file.fieldname === 'profile_image') folder = 'profiles';
-    const dir = path.join(process.env.UPLOAD_DIR || './uploads', folder);
-    ensureDir(dir);
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
-    cb(null, uniqueName);
-  },
-});
+// ── สร้าง multer instance ต่อ fieldname ─────────────────────────────────────
+function makeUpload(fieldname) {
+  const cfg = FIELD_CONFIG[fieldname];
 
-// File type filter
-const fileFilter = (req, file, cb) => {
-  const allowedImages = /jpeg|jpg|png|webp/;
-  const allowedDocs   = /pdf/;
-  const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: (req, file) => ({
+      folder:        cfg.folder,
+      resource_type: cfg.resource_type,
+      // ชื่อไฟล์ = timestamp-random (เหมือนเดิม)
+      public_id:     `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+      // สำหรับ PDF ต้องส่ง format ด้วย ไม่งั้น Cloudinary เดาผิด
+      ...(cfg.resource_type === 'raw' ? { format: 'pdf' } : {}),
+    }),
+  });
 
-  if (file.fieldname === 'contract_file') {
-    return cb(null, allowedDocs.test(ext));
-  }
-  cb(null, allowedImages.test(ext));
-};
+  const fileFilter = (req, file, cb) => {
+    const ext = file.originalname.split('.').pop().toLowerCase();
+    cb(null, cfg.formats.includes(ext));
+  };
 
-const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_SIZE_BYTES } });
+  return multer({ storage, fileFilter, limits: { fileSize: MAX_SIZE_BYTES } })
+    .single(fieldname);
+}
 
-// Named upload middleware exports
-const uploadMeterImage   = upload.single('meter_image');
-const uploadPaymentSlip  = upload.single('payment_slip');
-const uploadContractFile = upload.single('contract_file');
-const uploadProfileImage = upload.single('profile_image');
+// ── Export เหมือนเดิมทุก controller ใช้ได้เลย ───────────────────────────────
+const uploadMeterImage   = makeUpload('meter_image');
+const uploadPaymentSlip  = makeUpload('payment_slip');
+const uploadContractFile = makeUpload('contract_file');
+const uploadProfileImage = makeUpload('profile_image');
 
 module.exports = { uploadMeterImage, uploadPaymentSlip, uploadContractFile, uploadProfileImage };

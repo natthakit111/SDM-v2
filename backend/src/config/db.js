@@ -1,22 +1,27 @@
 const mysql = require('mysql2/promise');
 
-const pool = mysql.createPool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     parseInt(process.env.DB_PORT) || 3306,
-  user:     process.env.DB_USER     || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME     || 'smart_dormitory',
-  waitForConnections: true,
-  connectionLimit:    10,
-  queueLimit:         0,
-  timezone:           '+07:00', // Thailand timezone
-  charset:            'utf8mb4',
-});
+// Railway inject DATABASE_URL อัตโนมัติเมื่อเพิ่ม MySQL plugin
+// รองรับทั้ง DATABASE_URL และ individual env vars
+function getPoolConfig() {
+  if (process.env.DATABASE_URL) {
+    return { uri: process.env.DATABASE_URL, waitForConnections: true, connectionLimit: 10, queueLimit: 0, timezone: '+07:00', charset: 'utf8mb4' };
+  }
+  return {
+    host:     process.env.DB_HOST     || 'localhost',
+    port:     parseInt(process.env.DB_PORT) || 3306,
+    user:     process.env.DB_USER     || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME     || 'smart_dormitory',
+    waitForConnections: true,
+    connectionLimit:    10,
+    queueLimit:         0,
+    timezone:           '+07:00',
+    charset:            'utf8mb4',
+  };
+}
 
-/**
- * Test the database connection on server startup.
- * Exits the process if the connection fails.
- */
+const pool = mysql.createPool(getPoolConfig());
+
 const testConnection = async () => {
   try {
     const conn = await pool.getConnection();

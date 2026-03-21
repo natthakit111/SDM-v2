@@ -55,18 +55,21 @@ export function AdminNavbar() {
       .slice(0, 2) || "AD";
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border px-6">
+    // ✅ px-3 บนมือถือ → px-6 บน sm ขึ้นไป, gap-2 → gap-4
+    <header className="flex h-16 items-center gap-2 sm:gap-4 border-b border-border px-3 sm:px-6">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-6" />
-      <div className="flex-1">
-        <h2 className="text-sm font-medium text-muted-foreground">DormFlow</h2>
+      <div className="flex-1 min-w-0">
+        <h2 className="text-sm font-medium text-muted-foreground truncate">
+          DormFlow
+        </h2>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         <Button
           variant="ghost"
           size="icon"
-          className="relative"
+          className="relative shrink-0"
           onClick={() => router.push("/admin/notifications")}
         >
           <Bell className="h-5 w-5" />
@@ -79,12 +82,17 @@ export function AdminNavbar() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-3 px-2">
-              <Avatar className="h-8 w-8">
+            {/* ✅ px-1 บนมือถือ, gap-2 sm:gap-3 */}
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 sm:gap-3 px-1 sm:px-2"
+            >
+              <Avatar className="h-8 w-8 shrink-0">
                 <AvatarFallback className="bg-primary/20 text-primary text-sm">
                   {initials}
                 </AvatarFallback>
               </Avatar>
+              {/* ✅ hidden sm:block — ซ่อนชื่อบนมือถือ แสดงบน sm ขึ้นไป (เดิมก็ทำอยู่แล้ว) */}
               <div className="text-left hidden sm:block">
                 <p className="text-sm font-medium">
                   {user?.name || user?.username}
@@ -100,13 +108,11 @@ export function AdminNavbar() {
             <DropdownMenuLabel>{t("common.myAccount")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
-            {/* ✅ แก้: Profile → /admin/profile */}
             <DropdownMenuItem onClick={() => router.push("/admin/profile")}>
               <User className="mr-2 h-4 w-4" />
               {t("common.profile")}
             </DropdownMenuItem>
 
-            {/* ✅ แก้: Settings → /admin/settings */}
             <DropdownMenuItem onClick={() => router.push("/admin/settings")}>
               <Settings className="mr-2 h-4 w-4" />
               {t("common.settings")}

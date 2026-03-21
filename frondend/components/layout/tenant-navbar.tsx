@@ -28,7 +28,6 @@ export function TenantNavbar() {
   const [roomNumber, setRoomNumber] = useState<string>("-");
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // ── ดึงห้องจาก contract จริง ──────────────────────────────────────────────
   useEffect(() => {
     contractAPI
       .getMyContract()
@@ -38,7 +37,6 @@ export function TenantNavbar() {
       .catch(() => {});
   }, []);
 
-  // ── นับ notification จากบิลค้างชำระ ──────────────────────────────────────
   useEffect(() => {
     billAPI
       .getMyBills()
@@ -65,27 +63,29 @@ export function TenantNavbar() {
       .slice(0, 2) || "US";
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border px-6">
+    // ✅ px-3 บนมือถือ → px-6 บน sm ขึ้นไป
+    <header className="flex h-16 items-center gap-2 sm:gap-4 border-b border-border px-3 sm:px-6">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-6" />
 
-      {/* Room info */}
-      <div className="flex-1 flex items-center gap-3">
-        <DoorOpen className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <p className="text-sm font-medium">
+      {/* Room info — ✅ min-w-0 + truncate เพื่อไม่ให้ล้นบนจอเล็ก */}
+      <div className="flex-1 flex items-center gap-2 sm:gap-3 min-w-0">
+        <DoorOpen className="h-5 w-5 text-muted-foreground shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">
             {t("tenant.myRoom")} {roomNumber}
           </p>
-          <p className="text-xs text-muted-foreground">DormFlow</p>
+          <p className="text-xs text-muted-foreground hidden sm:block">
+            DormFlow
+          </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Bell — นับจากบิลค้างชำระจริง */}
+      <div className="flex items-center gap-2 sm:gap-4">
         <Button
           variant="ghost"
           size="icon"
-          className="relative"
+          className="relative shrink-0"
           onClick={() => router.push("/tenant/notifications")}
         >
           <Bell className="h-5 w-5" />
@@ -96,11 +96,13 @@ export function TenantNavbar() {
           )}
         </Button>
 
-        {/* User dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-3 px-2">
-              <Avatar className="h-8 w-8">
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 sm:gap-3 px-1 sm:px-2"
+            >
+              <Avatar className="h-8 w-8 shrink-0">
                 <AvatarFallback className="bg-primary/20 text-primary text-sm">
                   {initials}
                 </AvatarFallback>
@@ -120,7 +122,6 @@ export function TenantNavbar() {
             <DropdownMenuLabel>{t("common.myAccount")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
-            {/* โปรไฟล์ → ไปหน้า contract */}
             <DropdownMenuItem onClick={() => router.push("/tenant/contract")}>
               <User className="mr-2 h-4 w-4" />
               {t("common.profile")}

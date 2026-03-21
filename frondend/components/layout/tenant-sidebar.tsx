@@ -87,7 +87,8 @@ export function TenantSidebar() {
   ];
 
   return (
-    <Sidebar>
+    // ✅ เพิ่ม collapsible="offcanvas" → บนมือถือ sidebar จะ slide in/out แทนที่จะทับ content
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link href="/tenant" className="flex items-center gap-3 px-4 py-3">
           <div className="p-2 rounded-lg bg-primary/20">
@@ -133,7 +134,7 @@ export function TenantSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
-          {/* ✅ Language Toggle */}
+          {/* Language Toggle */}
           <SidebarMenuItem>
             <div className="flex items-center gap-2 px-2 py-1.5">
               <Languages className="h-4 w-4 text-muted-foreground shrink-0" />
