@@ -93,4 +93,7 @@ router.put('/profile', authenticate, updateProfileValidation, authController.upd
  */
 router.put('/change-password', authenticate, changePasswordValidation, authController.changePassword);
 
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
+
 module.exports = router;

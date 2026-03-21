@@ -17,12 +17,13 @@ const announcementRoutes = require('./announcement.routes')
 const telegramRoutes     = require('./telegram.routes')
 const reportRoutes       = require('./report.routes')
 const settingsRoutes     = require('./settings.routes')
+const moveOutRoutes      = require('./moveOut.routes')
+const oauthRoutes        = require('./oauth.routes')   // ✅ เพิ่ม
 
-// backend/src/routes/index.js — เพิ่มบรรทัดนี้
-const moveOutRoutes = require('./moveOut.routes');
-router.use('/move-out', moveOutRoutes);
+router.use('/move-out',      moveOutRoutes)
 
 router.use('/auth',          authRoutes)
+router.use('/auth',          oauthRoutes)              // ✅ เพิ่ม — /api/auth/google, /api/auth/telegram
 router.use('/rooms',         roomRoutes)
 router.use('/tenants',       tenantRoutes)
 router.use('/contracts',     contractRoutes)

@@ -18,6 +18,44 @@ import {
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
 import { Building2, Eye, EyeOff, Loader2 } from "lucide-react";
 
+/* ── OAuth brand icons (inline SVG) ── */
+const GoogleIcon = () => (
+  <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      fill="#4285F4"
+    />
+    <path
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      fill="#34A853"
+    />
+    <path
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      fill="#FBBC05"
+    />
+    <path
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      fill="#EA4335"
+    />
+  </svg>
+);
+
+const TelegramIcon = () => (
+  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0z"
+      fill="#2AABEE"
+    />
+    <path
+      d="M5.491 11.74l11.57-4.461c.537-.194 1.006.131.832.943l.001-.001-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953z"
+      fill="white"
+    />
+  </svg>
+);
+
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
@@ -26,23 +64,39 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<
+    "google" | "telegram" | null
+  >(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    const result = await login(username, password);
+    const result = await login(username, password, rememberMe);
 
     if (result.success && result.user) {
-      // ✅ redirect ใน page component — ไม่ผ่าน middleware
       router.push(result.user.role === "admin" ? "/admin" : "/tenant");
     } else {
       setError(result.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+      setPassword("");
     }
 
     setIsLoading(false);
   };
+
+  const handleGoogleLogin = () => {
+    setOauthLoading("google");
+    window.location.href = `${BACKEND_URL}/auth/google`;
+  };
+
+  const handleTelegramLogin = () => {
+    setOauthLoading("telegram");
+    window.location.href = `${BACKEND_URL}/auth/telegram`;
+  };
+
+  const isAnyLoading = isLoading || oauthLoading !== null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -54,9 +108,56 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl">DormFlow</CardTitle>
-          <CardDescription>ระบบจัดการหอพักครบวงจร</CardDescription>
+          <CardDescription>ระบบบริหารจัดการหอพัก</CardDescription>
         </CardHeader>
-        <CardContent>
+
+        <CardContent className="space-y-4">
+          {/* OAuth buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleLogin}
+              disabled={isAnyLoading}
+            >
+              {oauthLoading === "google" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <GoogleIcon />
+              )}
+              <span className="ml-2">Google</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleTelegramLogin}
+              disabled={isAnyLoading}
+            >
+              {oauthLoading === "telegram" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <TelegramIcon />
+              )}
+              <span className="ml-2">Telegram</span>
+            </Button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">
+                หรือเข้าสู่ระบบด้วย
+              </span>
+            </div>
+          </div>
+
+          {/* Username / Password form */}
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
@@ -68,9 +169,10 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isAnyLoading}
                 />
               </Field>
+
               <Field>
                 <FieldLabel htmlFor="password">รหัสผ่าน</FieldLabel>
                 <div className="relative">
@@ -81,13 +183,14 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    disabled={isLoading}
+                    disabled={isAnyLoading}
                     className="pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -98,13 +201,31 @@ export default function LoginPage() {
                 </div>
               </Field>
 
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={isAnyLoading}
+                  />
+                  จดจำฉัน
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-primary hover:underline"
+                >
+                  ลืมรหัสผ่าน?
+                </Link>
+              </div>
+
               {error && (
                 <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
                   {error}
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isAnyLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -117,29 +238,14 @@ export default function LoginPage() {
             </FieldGroup>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground">
             ยังไม่มีบัญชี?{" "}
             <Link href="/register" className="text-primary hover:underline">
               สมัครสมาชิก
             </Link>
-          </div>
-
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-2">บัญชีทดสอบ:</p>
-            <div className="text-xs space-y-1">
-              <p>
-                <span className="text-muted-foreground">Admin:</span> admin /
-                admin1234
-              </p>
-              <p>
-                <span className="text-muted-foreground">Tenant:</span> tenant01
-                / tenant1234
-              </p>
-            </div>
-          </div>
+          </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-

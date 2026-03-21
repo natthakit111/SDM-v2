@@ -28,6 +28,7 @@ interface AuthContextType {
   login: (
     username: string,
     password: string,
+    rememberMe: boolean,
   ) => Promise<{ success: boolean; error?: string; user?: User }>;
   register: (
     data: RegisterData,
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(mapUser(backendUser));
         } catch {
           localStorage.removeItem("token");
+          setUser(null); 
         }
       }
       setIsLoading(false);
@@ -79,37 +81,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init();
   }, []);
 
-  const login = async (username: string, password: string) => {
-    try {
-      const res = await api.post("/auth/login", { username, password });
+const login = async (
+  username: string,
+  password: string,
+  rememberMe: boolean,
+) => {
+  try {
+    const res = await api.post("/auth/login", {
+      username,
+      password,
+      rememberMe,
+    });
 
-      const payload = res.data.data;
-      const token = payload?.token;
-      const backendUser = payload?.user;
+    const payload = res.data.data;
+    const token = payload?.token;
+    const backendUser = payload?.user;
 
-      if (!token) {
-        return { success: false, error: "ไม่ได้รับ token จาก server" };
-      }
-
-      localStorage.setItem("token", token);
-
-      let mappedUser: User;
-      if (backendUser) {
-        mappedUser = mapUser(backendUser);
-      } else {
-        const meRes = await api.get("/auth/me");
-        const meUser = meRes.data.data ?? meRes.data.user ?? meRes.data;
-        mappedUser = mapUser(meUser);
-      }
-
-      setUser(mappedUser);
-      return { success: true, user: mappedUser };
-    } catch (err: any) {
-      const message =
-        err.response?.data?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
-      return { success: false, error: message };
+    if (!token) {
+      return { success: false, error: "ไม่ได้รับ token จาก server" };
     }
-  };
+
+    localStorage.setItem("token", token);
+
+    let mappedUser: User;
+    if (backendUser) {
+      mappedUser = mapUser(backendUser);
+    } else {
+      const meRes = await api.get("/auth/me");
+      const meUser = meRes.data.data ?? meRes.data.user ?? meRes.data;
+      mappedUser = mapUser(meUser);
+    }
+
+    setUser(mappedUser);
+    return { success: true, user: mappedUser };
+  } catch (err: any) {
+    const message =
+      err.response?.data?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
+    return { success: false, error: message };
+  }
+};
 
   const register = async (data: RegisterData) => {
     try {

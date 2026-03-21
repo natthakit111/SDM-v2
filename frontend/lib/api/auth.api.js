@@ -11,8 +11,14 @@ export const authAPI = {
 
   // data: { username, password, role? }
   // ⚠️ field ชื่อ `username` ไม่ใช่ `email`
-  login: (username, password) =>
-    api.post('/auth/login', { username, password }).then((r) => r.data),
+  login: (username, password, rememberMe) =>
+    api.post('/auth/login', { username, password, rememberMe }).then((r) => r.data),
+
+  forgotPassword: (username) =>
+    api.post('/auth/forgot-password', { username }).then((r) => r.data),
+
+  resetPassword: (token, newPassword) =>
+    api.post('/auth/reset-password', { token, newPassword }).then((r) => r.data),
 
   // returns: { token, user: { user_id, username, role } }
   getMe: () =>

@@ -3,10 +3,13 @@
  * Handles: POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
  */
 
+const crypto = require('crypto');
+const PasswordResetModel = require('../models/passwordReset.model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const UserModel = require('../models/user.model');
+const { sendResetPasswordEmail } = require('../services/email.service');
 const {
   sendSuccess,
   sendCreated,
@@ -18,15 +21,15 @@ const {
 // ─────────────────────────────────────────────
 // Helper: sign a JWT for a user
 // ─────────────────────────────────────────────
-const signToken = (user) => {
+const signToken = (user, rememberMe = false) => {
   return jwt.sign(
     {
-      user_id:  user.user_id,
+      user_id: user.user_id,
       username: user.username,
-      role:     user.role,
+      role: user.role,
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: rememberMe ? "7d" : "1d" }
   );
 };
 
@@ -70,41 +73,32 @@ const register = async (req, res, next) => {
 // ─────────────────────────────────────────────
 const login = async (req, res, next) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return sendBadRequest(res, 'Validation failed', errors.array());
-    }
-
-    const { username, password } = req.body;
+    const { username, password, rememberMe } = req.body;
 
     const user = await UserModel.findByUsername(username);
     if (!user) {
-      return sendUnauthorized(res, 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      return sendUnauthorized(res, "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
     }
 
     if (!user.is_active) {
-      return sendUnauthorized(res, 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+      return sendUnauthorized(res, "บัญชีนี้ถูกปิดการใช้งาน");
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return sendUnauthorized(res, 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      return sendUnauthorized(res, "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
     }
 
-    const token = signToken(user);
+    const token = signToken(user, rememberMe);
 
-    return sendSuccess(
-      res,
-      {
-        token,
-        user: {
-          user_id:  user.user_id,
-          username: user.username,
-          role:     user.role,
-        },
+    return sendSuccess(res, {
+      token,
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        role: user.role,
       },
-      'Login successful'
-    );
+    });
   } catch (err) {
     next(err);
   }
@@ -159,6 +153,70 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { username } = req.body;
+ 
+    if (!username || !username.trim()) {
+      return sendBadRequest(res, 'กรุณากรอก username');
+    }
+ 
+    const user = await UserModel.findByUsername(username.trim());
+ 
+    // ไม่บอกว่าไม่มี user — ป้องกัน user enumeration attack
+    if (!user) {
+      return sendSuccess(res, null, 'หากมีบัญชีนี้อยู่ในระบบ เราจะส่งลิงก์รีเซ็ตรหัสผ่านไปให้');
+    }
+ 
+    // ตรวจว่ามี email ไหม
+    if (!user.email) {
+      return sendBadRequest(res, 'บัญชีนี้ไม่มีอีเมลผูกอยู่ กรุณาติดต่อผู้ดูแลระบบ');
+    }
+ 
+    const token     = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 15); // 15 นาที
+ 
+    await PasswordResetModel.createResetToken(user.user_id, token, expiresAt);
+ 
+    // ส่ง email จริง
+    await sendResetPasswordEmail(user.email, user.username, token);
+ 
+    return sendSuccess(res, null, 'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลของคุณแล้ว');
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    const record = await PasswordResetModel.findByToken(token);
+    if (!record) {
+      return sendBadRequest(res, 'Token ไม่ถูกต้อง');
+    }
+
+    if (new Date(record.expires_at) < new Date()) {
+      return sendBadRequest(res, 'Token หมดอายุ');
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const newHash = await bcrypt.hash(newPassword, salt);
+
+    const { pool } = require('../config/db');
+    await pool.query(
+      'UPDATE users SET password_hash = ? WHERE user_id = ?',
+      [newHash, record.user_id]
+    );
+
+    await PasswordResetModel.deleteToken(token);
+
+    return sendSuccess(res, null, 'เปลี่ยนรหัสผ่านสำเร็จ');
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─────────────────────────────────────────────
 // PUT /api/auth/change-password
 // Protected: requires valid JWT
@@ -199,4 +257,4 @@ const changePassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, changePassword };
+module.exports = { register, login, getMe, updateProfile, changePassword, forgotPassword, resetPassword,  };
