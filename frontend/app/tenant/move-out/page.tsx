@@ -83,7 +83,11 @@ export default function MoveOutPage() {
     moveOutAPI
       .getAll()
       .then((r) => setRequests(r.data ?? []))
-      .catch(() => toast.error(t("moveout.loadError")))
+      .catch((err) => {
+        if (err?.response?.status !== 404) {
+          toast.error(t("moveout.loadError"));
+        }
+      })
       .finally(() => setLoading(false));
   };
 
