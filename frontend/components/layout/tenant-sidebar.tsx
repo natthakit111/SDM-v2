@@ -25,6 +25,7 @@ import {
   History,
   LogOut,
   Languages,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +82,11 @@ export function TenantSidebar() {
           title: t("tenant.moveout.title"),
           href: "/tenant/move-out",
           icon: LogOut,
+        },
+        {
+          title: t("tenant.profile.title"),
+          href: "/tenant/profile",
+          icon: User,
         },
       ],
     },
