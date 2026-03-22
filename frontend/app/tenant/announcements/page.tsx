@@ -1,5 +1,3 @@
-//tenant/annnouncement/page.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -31,7 +29,12 @@ export default function TenantAnnouncementsPage() {
     announcementAPI
       .getAll()
       .then((r) => setAnnouncements(r.data ?? []))
-      .catch(() => toast.error(t("common.noData")))
+      .catch((err) => {
+        // 404 = ยังไม่มีประกาศ — ไม่ต้อง toast
+        if (err?.response?.status !== 404) {
+          toast.error(t("common.noData"));
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -146,7 +149,6 @@ export default function TenantAnnouncementsPage() {
               ))}
             </div>
           )}
-
           {others.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
@@ -158,7 +160,6 @@ export default function TenantAnnouncementsPage() {
               ))}
             </div>
           )}
-
           {filtered.length === 0 && (
             <Card>
               <CardContent className="pt-10 text-center py-12">

@@ -91,7 +91,11 @@ export default function TenantBillsPage() {
     billAPI
       .getMyBills()
       .then((r) => setBills(r.data ?? r ?? []))
-      .catch(() => toast.error(t("common.noData")))
+      .catch((err) => {
+        if (err?.response?.status !== 404) {
+          toast.error(t("common.noData"));
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 

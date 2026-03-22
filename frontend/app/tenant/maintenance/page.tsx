@@ -66,7 +66,12 @@ export default function TenantMaintenancePage() {
     maintenanceAPI
       .getMyRequests()
       .then((r) => setRequests(r.data ?? []))
-      .catch(() => toast.error(t("maintenance.loadError")))
+      .catch((err) => {
+        // 404 = ยังไม่มีรายการ (user ใหม่) — ไม่ต้อง toast
+        if (err?.response?.status !== 404) {
+          toast.error(t("maintenance.loadError"));
+        }
+      })
       .finally(() => setLoading(false));
   };
 
@@ -99,7 +104,10 @@ export default function TenantMaintenancePage() {
 
   const categoryOptions = [
     { value: "ซ่อมแซม", label: language === "th" ? "ซ่อมแซม" : "Repair" },
-    { value: "ทำความสะอาด", label: language === "th" ? "ทำความสะอาด" : "Cleaning" },
+    {
+      value: "ทำความสะอาด",
+      label: language === "th" ? "ทำความสะอาด" : "Cleaning",
+    },
     { value: "ไฟฟ้า", label: language === "th" ? "ไฟฟ้า" : "Electrical" },
     { value: "ประปา", label: language === "th" ? "ประปา" : "Plumbing" },
     { value: "อื่นๆ", label: language === "th" ? "อื่นๆ" : "Other" },
@@ -107,14 +115,23 @@ export default function TenantMaintenancePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{t("tenant.maintenance.title")}</h1>
-          <p className="text-muted-foreground mt-2">{t("tenant.maintenance.subtitle")}</p>
+          <h1 className="text-3xl font-bold">
+            {t("tenant.maintenance.title")}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {t("tenant.maintenance.subtitle")}
+          </p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setDone(false); }}>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setDone(false);
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
@@ -124,7 +141,9 @@ export default function TenantMaintenancePage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t("tenant.maintenance.title")}</DialogTitle>
-              <DialogDescription>{t("tenant.maintenance.subtitle")}</DialogDescription>
+              <DialogDescription>
+                {t("tenant.maintenance.subtitle")}
+              </DialogDescription>
             </DialogHeader>
 
             {done ? (
@@ -138,14 +157,18 @@ export default function TenantMaintenancePage() {
                   <FieldLabel>{t("maintenance.colCategory")}</FieldLabel>
                   <Select
                     value={formData.category}
-                    onValueChange={(v) => setFormData((p) => ({ ...p, category: v }))}
+                    onValueChange={(v) =>
+                      setFormData((p) => ({ ...p, category: v }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={t("maintenance.colCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {categoryOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -155,7 +178,12 @@ export default function TenantMaintenancePage() {
                   <Textarea
                     placeholder={t("maintenance.description")}
                     value={formData.description}
-                    onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
                     className="min-h-28"
                   />
                 </Field>
@@ -163,18 +191,26 @@ export default function TenantMaintenancePage() {
                   <FieldLabel>{t("maintenance.colPriority")}</FieldLabel>
                   <Select
                     value={formData.priority}
-                    onValueChange={(v) => setFormData((p) => ({ ...p, priority: v }))}
+                    onValueChange={(v) =>
+                      setFormData((p) => ({ ...p, priority: v }))
+                    }
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">{t("priority.low")}</SelectItem>
-                      <SelectItem value="medium">{t("priority.medium")}</SelectItem>
+                      <SelectItem value="medium">
+                        {t("priority.medium")}
+                      </SelectItem>
                       <SelectItem value="high">{t("priority.high")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel>{t("meters.image")} ({t("common.note")})</FieldLabel>
+                  <FieldLabel>
+                    {t("meters.image")} ({t("common.note")})
+                  </FieldLabel>
                   <Input
                     type="file"
                     accept="image/*"
@@ -186,11 +222,17 @@ export default function TenantMaintenancePage() {
 
             {!done && (
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  disabled={submitting}
+                >
                   {t("common.cancel")}
                 </Button>
                 <Button onClick={handleSubmit} disabled={submitting}>
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {t("common.submit")}
                 </Button>
               </DialogFooter>
@@ -199,16 +241,25 @@ export default function TenantMaintenancePage() {
         </Dialog>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: t("common.all"), value: requests.length, color: "" },
-          { label: t("status.in_progress"), value: requests.filter((r) => r.status === "in_progress").length, color: "text-blue-500" },
-          { label: t("status.resolved"), value: requests.filter((r) => r.status === "resolved").length, color: "text-green-500" },
+          {
+            label: t("status.in_progress"),
+            value: requests.filter((r) => r.status === "in_progress").length,
+            color: "text-blue-500",
+          },
+          {
+            label: t("status.resolved"),
+            value: requests.filter((r) => r.status === "resolved").length,
+            color: "text-green-500",
+          },
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {label}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${color}`}>{value}</div>
@@ -217,7 +268,6 @@ export default function TenantMaintenancePage() {
         ))}
       </div>
 
-      {/* List */}
       <Card>
         <CardHeader>
           <CardTitle>{t("maintenance.listTitle")}</CardTitle>
@@ -229,24 +279,34 @@ export default function TenantMaintenancePage() {
               {t("common.loading")}
             </div>
           ) : requests.length === 0 ? (
-            // ✅ Empty state สำหรับ tenant ใหม่
             <div className="text-center py-12">
               <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
-              <p className="font-medium text-muted-foreground">{t("empty.noMaintenance")}</p>
-              <p className="text-sm text-muted-foreground mt-1">{t("empty.noMaintenanceDesc")}</p>
+              <p className="font-medium text-muted-foreground">
+                {t("empty.noMaintenance")}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t("empty.noMaintenanceDesc")}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {requests.map((r) => (
-                <div key={r.request_id} className="flex items-start gap-4 p-4 border rounded-lg">
+                <div
+                  key={r.request_id}
+                  className="flex items-start gap-4 p-4 border rounded-lg"
+                >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium">{r.category}</p>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{r.description}</p>
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {r.description}
+                        </p>
                         <div className="flex gap-2 mt-2">
                           <PriorityBadge priority={r.priority} />
-                          <span className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {fmtDate(r.created_at)}
+                          </span>
                         </div>
                         {r.admin_note && (
                           <p className="text-xs text-muted-foreground mt-2 bg-muted/50 px-2 py-1 rounded">

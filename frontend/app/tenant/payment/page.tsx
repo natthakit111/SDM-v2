@@ -89,7 +89,12 @@ export default function TenantPaymentPage() {
           setSelectedBillId(String(pending[0].bill_id));
         }
       })
-      .catch(() => toast.error(t("payment.loadError")))
+      .catch((err) => {
+        // 404 = ยังไม่มีบิล (user ใหม่) — ไม่ต้อง toast
+        if (err?.response?.status !== 404) {
+          toast.error(t("payment.loadError"));
+        }
+      })
       .finally(() => setLoading(false));
   }, [billIdFromUrl]);
 
