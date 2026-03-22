@@ -75,7 +75,12 @@ export default function TenantPaymentHistoryPage() {
     paymentAPI
       .getMyPayments()
       .then((r) => setPayments(r.data ?? []))
-      .catch(() => toast.error(t("payment.loadError")))
+      .catch((err) => {
+        // 404 = ยังไม่มีประวัติการชำระ (user ใหม่) — ไม่ต้อง toast
+        if (err?.response?.status !== 404) {
+          toast.error(t("payment.loadError"));
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -97,7 +102,9 @@ export default function TenantPaymentHistoryPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">{t("payments.history")}</h1>
-        <p className="text-muted-foreground mt-2">{t("paymentHistory.subtitle")}</p>
+        <p className="text-muted-foreground mt-2">
+          {t("paymentHistory.subtitle")}
+        </p>
       </div>
 
       {loading ? (
@@ -106,17 +113,19 @@ export default function TenantPaymentHistoryPage() {
           {t("common.loading")}
         </div>
       ) : payments.length === 0 ? (
-        // ✅ Empty state สำหรับ tenant ใหม่
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <FileText className="h-14 w-14 text-muted-foreground mb-4 opacity-40" />
-            <p className="font-medium text-muted-foreground">{t("empty.noPayments")}</p>
-            <p className="text-sm text-muted-foreground mt-1">{t("empty.noPaymentsDesc")}</p>
+            <p className="font-medium text-muted-foreground">
+              {t("empty.noPayments")}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t("empty.noPaymentsDesc")}
+            </p>
           </CardContent>
         </Card>
       ) : (
         <>
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -125,7 +134,9 @@ export default function TenantPaymentHistoryPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-500">{fmt(totalPaid)}</div>
+                <div className="text-2xl font-bold text-green-500">
+                  {fmt(totalPaid)}
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -151,7 +162,6 @@ export default function TenantPaymentHistoryPage() {
             </Card>
           </div>
 
-          {/* Filter */}
           <Card>
             <CardContent className="pt-6">
               <Select value={filterMonth} onValueChange={setFilterMonth}>
@@ -176,13 +186,14 @@ export default function TenantPaymentHistoryPage() {
             </CardContent>
           </Card>
 
-          {/* List */}
           <div className="space-y-3">
             {filtered.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">{t("empty.noPayments")}</p>
+                  <p className="text-muted-foreground">
+                    {t("empty.noPayments")}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -197,7 +208,9 @@ export default function TenantPaymentHistoryPage() {
                             <FileText className="w-6 h-6 text-green-500" />
                           </div>
                           <div>
-                            <p className="font-bold">{t("bills.list")} #{p.bill_id}</p>
+                            <p className="font-bold">
+                              {t("bills.list")} #{p.bill_id}
+                            </p>
                             <div className="flex flex-wrap gap-2 mt-2">
                               <span className="text-xs bg-muted px-2 py-1 rounded">
                                 {methodLabel(p.payment_method)}
@@ -207,7 +220,9 @@ export default function TenantPaymentHistoryPage() {
                               </span>
                             </div>
                             {p.remark && (
-                              <p className="text-xs text-muted-foreground mt-1">{p.remark}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {p.remark}
+                              </p>
                             )}
                           </div>
                         </div>
@@ -215,7 +230,9 @@ export default function TenantPaymentHistoryPage() {
                           <p className="text-2xl font-bold text-green-500">
                             {fmt(Number(p.amount_paid))}
                           </p>
-                          <span className={`text-xs px-2 py-0.5 rounded ${s.color}`}>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded ${s.color}`}
+                          >
                             {s.label}
                           </span>
                         </div>
