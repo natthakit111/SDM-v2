@@ -44,12 +44,14 @@ const signToken = (user) =>
    Helper: upsert OAuth user
 ───────────────────────────────────────── */
 async function upsertOAuthUser({ provider, providerId, email, displayName }) {
+  // 1. Find by provider + providerId
   const [existing] = await pool.query(
     'SELECT * FROM users WHERE oauth_provider = ? AND oauth_provider_id = ? LIMIT 1',
     [provider, String(providerId)]
   );
   if (existing.length > 0) return existing[0];
-
+ 
+  // 2. Find by email (link accounts)
   if (email) {
     const [byEmail] = await pool.query(
       'SELECT * FROM users WHERE email = ? LIMIT 1',
@@ -64,11 +66,30 @@ async function upsertOAuthUser({ provider, providerId, email, displayName }) {
     }
   }
 
-  const username  = `${provider}_${providerId}`;
-  const nameParts = (displayName || username).split(' ');
+  // 3. Create new tenant account
+  const nameParts = (displayName || '').trim().split(' ');
   const firstName = nameParts[0] || '';
   const lastName  = nameParts.slice(1).join(' ') || '';
-
+ 
+  // ใช้ชื่อจริงเป็น base username (lowercase, no space)
+  const baseUsername = (displayName || `${provider}_${providerId}`)
+    .toLowerCase()
+    .replace(/\s+/g, '_')       // space → underscore
+    .replace(/[^a-z0-9_]/g, '') // ตัดอักขระพิเศษออก
+    .slice(0, 40);              // จำกัดความยาว
+ 
+  // ป้องกันชื่อซ้ำ — เติม _2, _3 ถ้าซ้ำ
+  let username = baseUsername;
+  let counter  = 2;
+  while (true) {
+    const [taken] = await pool.query(
+      'SELECT user_id FROM users WHERE username = ? LIMIT 1',
+      [username]
+    );
+    if (taken.length === 0) break;
+    username = `${baseUsername}_${counter++}`;
+  }
+ 
   const [result] = await pool.query(
     `INSERT INTO users
        (username, password_hash, role, first_name, last_name, email,
@@ -76,7 +97,7 @@ async function upsertOAuthUser({ provider, providerId, email, displayName }) {
      VALUES (?, '', 'tenant', ?, ?, ?, ?, ?, 1)`,
     [username, firstName, lastName, email || null, provider, String(providerId)]
   );
-
+ 
   const [newUser] = await pool.query(
     'SELECT * FROM users WHERE user_id = ? LIMIT 1',
     [result.insertId]
