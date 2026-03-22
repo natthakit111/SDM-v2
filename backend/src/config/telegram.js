@@ -8,7 +8,8 @@
  */
 
 const TelegramBot = require('node-telegram-bot-api');
-const axios       = require('axios');
+const https       = require('https');
+
 
 let bot = null;
 
@@ -28,10 +29,21 @@ const initBot = () => {
     const telegramUsername = msg.from?.username || '';
 
     try {
-      await axios.post(`${BACKEND}/telegram/link`, {
-        token,
-        chat_id:           chatId,
-        telegram_username: telegramUsername,
+      const http = require('http');
+      const body = JSON.stringify({ token, chat_id: chatId, telegram_username: telegramUsername });
+      await new Promise((resolve, reject) => {
+        const url = new URL(`${BACKEND}/telegram/link`);
+        const mod = url.protocol === 'https:' ? require('https') : require('http');
+        const req = mod.request({
+          hostname: url.hostname,
+          port: url.port,
+          path: url.pathname,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        }, resolve);
+        req.on('error', reject);
+        req.write(body);
+        req.end();
       });
       // Welcome message ส่งใน route แล้ว
     } catch (err) {
