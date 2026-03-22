@@ -1,143 +1,143 @@
 /**
- * config/telegram.js
- * Telegram Bot polling — handles /start link_<token> and /status
- *
- * Call initBot() from server.js after app.listen()
+ * routes/telegram.routes.js
+ * Base path: /api/telegram
  */
 
-const TelegramBot = require('node-telegram-bot-api');
+const express = require('express');
+const router  = express.Router();
+const crypto  = require('crypto');
+const { pool } = require('../config/db');
+const { authenticate } = require('../middlewares/auth.middleware');
+const { sendSuccess, sendBadRequest } = require('../utils/response');
 
-let bot = null;
+// ─────────────────────────────────────────────
+// GET /api/telegram/status
+// ตรวจสอบว่า user เชื่อม Telegram แล้วหรือยัง
+// ─────────────────────────────────────────────
+router.get('/status', authenticate, async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT telegram_chat_id FROM users WHERE user_id = ?',
+      [req.user.user_id]
+    );
+    const linked = !!(rows[0]?.telegram_chat_id);
+    return sendSuccess(res, { linked, chat_id: rows[0]?.telegram_chat_id || null });
+  } catch (err) { next(err); }
+});
 
-const initBot = () => {
-  if (!process.env.TELEGRAM_BOT_TOKEN) {
-    console.warn('[Bot] TELEGRAM_BOT_TOKEN not set — bot disabled');
-    return;
-  }
+// ─────────────────────────────────────────────
+// POST /api/telegram/generate-link
+// สร้าง deep link สำหรับเชื่อม Telegram
+// Bot จะรับ /start <token> แล้ว link กลับมา
+// ─────────────────────────────────────────────
+router.post('/generate-link', authenticate, async (req, res, next) => {
+  try {
+    const token     = crypto.randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 10); // 10 นาที
 
-  const startPolling = () => {
-    // ถ้ามี instance เก่าอยู่ให้หยุดก่อน
-    if (bot) {
-      try { bot.stopPolling(); } catch {}
-      bot = null;
+    // บันทึก token ลงฐานข้อมูล
+    await pool.query(
+      `INSERT INTO telegram_link_tokens (user_id, token, expires_at)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE token = VALUES(token), expires_at = VALUES(expires_at)`,
+      [req.user.user_id, token, expiresAt]
+    );
+
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
+    const deepLink    = `https://t.me/${botUsername}?start=link_${token}`;
+
+    return sendSuccess(res, { deepLink, token, expiresAt });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/telegram/link
+// เรียกโดย bot หลังจาก user กด deep link
+// Body: { token, chat_id, telegram_username }
+// ─────────────────────────────────────────────
+router.post('/link', async (req, res, next) => {
+  try {
+    const { token, chat_id, telegram_username } = req.body;
+    if (!token || !chat_id) return sendBadRequest(res, 'token and chat_id are required');
+
+    // ตรวจ token
+    const [rows] = await pool.query(
+      'SELECT * FROM telegram_link_tokens WHERE token = ? AND expires_at > NOW()',
+      [token]
+    );
+    if (!rows.length) return sendBadRequest(res, 'Token ไม่ถูกต้องหรือหมดอายุ');
+
+    const { user_id } = rows[0];
+
+    // บันทึก chat_id
+    await pool.query(
+      'UPDATE users SET telegram_chat_id = ? WHERE user_id = ?',
+      [String(chat_id), user_id]
+    );
+
+    // ลบ token ทิ้ง
+    await pool.query('DELETE FROM telegram_link_tokens WHERE token = ?', [token]);
+
+    // ส่งข้อความต้อนรับ
+    try {
+      const TelegramService = require('../services/telegram.service');
+      const [userRows] = await pool.query(
+        'SELECT username FROM users WHERE user_id = ?',
+        [user_id]
+      );
+      const username = userRows[0]?.username || 'ผู้เช่า';
+      const TelegramBot = require('node-telegram-bot-api');
+      const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
+      await bot.sendMessage(
+        chat_id,
+        `✅ *เชื่อมต่อ Telegram สำเร็จ!*\n\nสวัสดี @${telegram_username || username}!\nคุณจะได้รับการแจ้งเตือนค่าเช่า บิล และข่าวสารจากหอพักผ่าน Telegram นี้\n\nพิมพ์ /status เพื่อดูสถานะบิลปัจจุบัน`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (e) {
+      console.error('[Telegram] Welcome message failed:', e.message);
     }
 
-    bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
+    return sendSuccess(res, null, 'เชื่อมต่อ Telegram สำเร็จ');
+  } catch (err) { next(err); }
+});
 
-    bot.startPolling({ restart: false })
-      .then(() => {
-        console.log('🤖 Telegram Bot polling started');
-        registerHandlers();
-      })
-      .catch((err) => {
-        if (err?.code === 'ETELEGRAM' && err?.message?.includes('409')) {
-          // instance เก่ายังไม่ตาย — รอแล้ว retry
-          console.warn('[Bot] 409 Conflict — retrying in 5s...');
-          setTimeout(startPolling, 5000);
-        } else {
-          console.error('[Bot] Failed to start polling:', err.message);
-        }
-      });
+// ─────────────────────────────────────────────
+// DELETE /api/telegram/unlink
+// ยกเลิกการเชื่อม Telegram
+// ─────────────────────────────────────────────
+router.delete('/unlink', authenticate, async (req, res, next) => {
+  try {
+    await pool.query(
+      'UPDATE users SET telegram_chat_id = NULL WHERE user_id = ?',
+      [req.user.user_id]
+    );
+    return sendSuccess(res, null, 'ยกเลิกการเชื่อมต่อ Telegram แล้ว');
+  } catch (err) { next(err); }
+});
 
-    // จัดการ polling error ที่เกิดระหว่างรัน
-    bot.on('polling_error', (err) => {
-      if (err?.code === 'ETELEGRAM' && err?.message?.includes('409')) {
-        console.warn('[Bot] 409 Conflict during polling — retrying in 5s...');
-        bot.stopPolling().catch(() => {});
-        setTimeout(startPolling, 5000);
-      } else {
-        console.error('[Bot] polling_error:', err.message);
-      }
-    });
-  };
+// ─────────────────────────────────────────────
+// POST /api/telegram/broadcast  — admin only
+// ─────────────────────────────────────────────
+router.post('/broadcast', authenticate, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { message } = req.body;
+    if (!message?.trim()) return sendBadRequest(res, 'message is required');
 
-  const registerHandlers = () => {
-    const BACKEND = process.env.BACKEND_URL || 'http://localhost:5000/api';
+    const TelegramService = require('../services/telegram.service');
+    await TelegramService.broadcastAnnouncement('ข้อความจากผู้ดูแล', message, 'tenant', null);
 
-    // ── /start link_<token> ──
-    bot.onText(/\/start link_([a-f0-9]+)/, async (msg, match) => {
-      const chatId           = msg.chat.id;
-      const token            = match[1];
-      const telegramUsername = msg.from?.username || '';
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM users u
+       JOIN tenants t ON u.user_id = t.user_id
+       JOIN contracts c ON c.tenant_id = t.tenant_id AND c.status = 'active'
+       WHERE u.is_active = 1 AND u.telegram_chat_id IS NOT NULL`
+    );
+    const total = rows[0]?.total ?? 0;
+    return sendSuccess(res, { sent: total }, `Broadcast sent to ${total} tenant(s)`);
+  } catch (err) { next(err); }
+});
 
-      try {
-        const body = JSON.stringify({ token, chat_id: chatId, telegram_username: telegramUsername });
-        await new Promise((resolve, reject) => {
-          const url = new URL(`${BACKEND}/telegram/link`);
-          const mod = url.protocol === 'https:' ? require('https') : require('http');
-          const req = mod.request({
-            hostname: url.hostname,
-            port:     url.port || (url.protocol === 'https:' ? 443 : 80),
-            path:     url.pathname,
-            method:   'POST',
-            headers: {
-              'Content-Type':   'application/json',
-              'Content-Length': Buffer.byteLength(body),
-            },
-          }, resolve);
-          req.on('error', reject);
-          req.write(body);
-          req.end();
-        });
-      } catch (err) {
-        bot.sendMessage(chatId, `❌ เกิดข้อผิดพลาด\n\nลิงก์อาจหมดอายุแล้ว กรุณากลับไปสร้างลิงก์ใหม่ที่แอป`);
-      }
-    });
-
-    // ── /start (ไม่มี token) ──
-    bot.onText(/\/start$/, (msg) => {
-      bot.sendMessage(
-        msg.chat.id,
-        `👋 สวัสดีครับ!\n\nบอทนี้ใช้สำหรับรับแจ้งเตือนจากระบบหอพัก DormFlow\n\nวิธีเชื่อมต่อ:\n1. เปิดแอป DormFlow\n2. ไปที่ โปรไฟล์\n3. กด "เชื่อมต่อ Telegram"\n4. กดลิงก์ที่ได้`
-      );
-    });
-
-    // ── /status ──
-    bot.onText(/\/status/, async (msg) => {
-      const chatId = msg.chat.id;
-      const { pool } = require('./db');
-      try {
-        const [bills] = await pool.query(`
-          SELECT b.bill_month, b.bill_year, b.total_amount, b.status, r.room_number
-          FROM bills b
-          JOIN rooms r ON b.room_id = r.room_id
-          JOIN contracts c ON b.contract_id = c.contract_id
-          JOIN tenants t ON c.tenant_id = t.tenant_id
-          JOIN users u ON t.user_id = u.user_id
-          WHERE u.telegram_chat_id = ? AND b.status IN ('pending','overdue')
-          ORDER BY b.bill_year DESC, b.bill_month DESC LIMIT 3
-        `, [String(chatId)]);
-
-        if (!bills.length) return bot.sendMessage(chatId, '✅ ไม่มีบิลค้างชำระ');
-
-        const MONTHS = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-        const text = bills.map(b =>
-          `📋 ห้อง ${b.room_number} | ${MONTHS[b.bill_month]} ${b.bill_year} | *${Number(b.total_amount).toLocaleString()} บาท* | ${b.status === 'overdue' ? '🔴 เกินกำหนด' : '🟡 รอชำระ'}`
-        ).join('\n');
-        bot.sendMessage(chatId, `📊 *บิลค้างชำระ:*\n\n${text}`, { parse_mode: 'Markdown' });
-      } catch {
-        bot.sendMessage(chatId, '❌ เกิดข้อผิดพลาด กรุณาลองใหม่');
-      }
-    });
-
-    // ── /unlink ──
-    bot.onText(/\/unlink/, async (msg) => {
-      const chatId = msg.chat.id;
-      const { pool } = require('./db');
-      try {
-        await pool.query(
-          'UPDATE users SET telegram_chat_id = NULL WHERE telegram_chat_id = ?',
-          [String(chatId)]
-        );
-        bot.sendMessage(chatId, '✅ ยกเลิกการเชื่อมต่อแล้ว คุณจะไม่ได้รับแจ้งเตือนอีกต่อไป');
-      } catch {
-        bot.sendMessage(chatId, '❌ เกิดข้อผิดพลาด');
-      }
-    });
-  };
-
-  // เริ่ม polling (หน่วง 2 วินาทีให้ instance เก่าตายก่อน)
-  setTimeout(startPolling, 2000);
-};
-
-module.exports = { initBot };
+module.exports = router;
