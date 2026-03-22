@@ -28,6 +28,7 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function TenantSidebar() {
   const pathname = usePathname();
@@ -117,7 +118,8 @@ export function TenantSidebar() {
               {group.items.map((item) => {
                 const isActive =
                   pathname === item.href ||
-                  (item.href !== "/tenant" && pathname.startsWith(item.href));
+                  (item.href !== "/tenant" &&
+                    pathname.startsWith(item.href + "/"));
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -140,6 +142,16 @@ export function TenantSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
+          {/* Theme Toggle */}
+          <SidebarMenuItem>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <span className="text-sm text-muted-foreground flex-1">
+                {language === "th" ? "ธีม" : "Theme"}
+              </span>
+              <ThemeToggle variant="dropdown" />
+            </div>
+          </SidebarMenuItem>
+
           {/* Language Toggle */}
           <SidebarMenuItem>
             <div className="flex items-center gap-2 px-2 py-1.5">

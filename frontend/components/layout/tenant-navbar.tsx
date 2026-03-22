@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bell, LogOut, User, DoorOpen } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
 import { contractAPI } from "@/lib/api/contract.api";
-import { billAPI } from "@/lib/api/bill.api";
+import { useNotification } from "@/context/notification-context";
 
 export function TenantNavbar() {
   const { user, logout } = useAuth();
@@ -26,25 +27,13 @@ export function TenantNavbar() {
   const router = useRouter();
 
   const [roomNumber, setRoomNumber] = useState<string>("-");
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount } = useNotification();
 
   useEffect(() => {
     contractAPI
       .getMyContract()
       .then((r) => {
         if (r.data?.room_number) setRoomNumber(r.data.room_number);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    billAPI
-      .getMyBills()
-      .then((r) => {
-        const pending = (r.data ?? []).filter(
-          (b: any) => b.status === "pending" || b.status === "overdue",
-        );
-        setUnreadCount(pending.length);
       })
       .catch(() => {});
   }, []);
@@ -82,6 +71,8 @@ export function TenantNavbar() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
+        <ThemeToggle variant="icon-only" />
+
         <Button
           variant="ghost"
           size="icon"

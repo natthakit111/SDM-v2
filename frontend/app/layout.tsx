@@ -1,47 +1,54 @@
-//tenant/layout.tsx
+import type { Metadata, Viewport } from "next";
+import { Noto_Sans_Thai } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/context/auth-context";
+import { LanguageProvider } from "@/context/language-context";
+import { ThemeProvider } from "next-themes";
+import "./globals.css";
 
-import type { Metadata, Viewport } from 'next'
-import { Noto_Sans_Thai } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import { Toaster } from '@/components/ui/sonner'
-import { AuthProvider } from '@/context/auth-context'
-import { LanguageProvider } from '@/context/language-context'
-import './globals.css'
-
-const notoSansThai = Noto_Sans_Thai({ 
-  subsets: ['thai', 'latin'],
-  variable: '--font-noto-sans-thai',
-  display: 'swap',
-})
+const notoSansThai = Noto_Sans_Thai({
+  subsets: ["thai", "latin"],
+  variable: "--font-noto-sans-thai",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: 'DormFlow - ระบบจัดการหอพัก',
-  description: 'ระบบจัดการหอพักครบวงจร จัดการห้องพัก ผู้เช่า บิล และการชำระเงินได้ง่ายๆ',
-  generator: 'v0.app',
-}
+  title: "DormFlow - ระบบจัดการหอพัก",
+  description:
+    "ระบบจัดการหอพัก จัดการห้องพัก ผู้เช่า บิล และการชำระเงินได้ง่ายๆ",
+};
 
 export const viewport: Viewport = {
-  themeColor: '#1a1f35',
-  width: 'device-width',
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#1a1f35" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
+  width: "device-width",
   initialScale: 1,
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className="dark">
+    <html lang="th" suppressHydrationWarning>
       <body className={`${notoSansThai.variable} font-sans antialiased`}>
-        <AuthProvider>
-          <LanguageProvider>
-            {children}
-          </LanguageProvider>
-        </AuthProvider>
-        <Toaster />
-        <Analytics />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <LanguageProvider>{children}</LanguageProvider>
+          </AuthProvider>
+          <Toaster />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

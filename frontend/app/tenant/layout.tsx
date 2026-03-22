@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { TenantSidebar } from "@/components/layout/tenant-sidebar";
 import { TenantNavbar } from "@/components/layout/tenant-navbar";
+import { TenantBottomNav } from "@/components/layout/tenant-bottom-nav";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { NotificationProvider } from "@/context/notification-context";
 import { Loader2 } from "lucide-react";
 
 export default function TenantLayout({
@@ -30,21 +32,30 @@ export default function TenantLayout({
     );
   }
 
-  if (!user || user.role !== "tenant") {
-    return null;
-  }
+  if (!user || user.role !== "tenant") return null;
 
   return (
-    <SidebarProvider
-      defaultOpen={
-        typeof window !== "undefined" ? window.innerWidth >= 768 : true
-      }
-    >
-      <TenantSidebar />
-      <SidebarInset>
-        <TenantNavbar />
-        <main className="flex-1 p-3 sm:p-4 md:p-6">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <NotificationProvider>
+      <SidebarProvider
+        defaultOpen={
+          typeof window !== "undefined" ? window.innerWidth >= 768 : true
+        }
+      >
+        {/* Sidebar — desktop only */}
+        <div className="hidden md:block">
+          <TenantSidebar />
+        </div>
+
+        <SidebarInset>
+          <TenantNavbar />
+          <main className="flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6">
+            {children}
+          </main>
+        </SidebarInset>
+
+        {/* Bottom nav — mobile only */}
+        <TenantBottomNav />
+      </SidebarProvider>
+    </NotificationProvider>
   );
 }
