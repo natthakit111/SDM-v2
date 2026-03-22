@@ -252,8 +252,10 @@ export default function TenantProfilePage() {
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">โปรไฟล์</h1>
-        <p className="text-muted-foreground mt-1">จัดการข้อมูลส่วนตัวของคุณ</p>
+        <h1 className="text-3xl font-bold">{t("tenant.profile.title")}</h1>
+        <p className="text-muted-foreground mt-1">
+          {t("tenant.profile.subtitle")}
+        </p>
       </div>
 
       {/* Avatar card */}
@@ -283,16 +285,18 @@ export default function TenantProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Pencil className="h-5 w-5 text-primary" />
-            ข้อมูลส่วนตัว
+            {t("tenant.profile.personalInfo")}
           </CardTitle>
-          <CardDescription>แก้ไขชื่อ อีเมล และเบอร์โทรศัพท์</CardDescription>
+          <CardDescription>{t("tenant.profile.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleProfileSubmit}>
             <FieldGroup>
               <div className="grid grid-cols-2 gap-3">
                 <Field>
-                  <FieldLabel htmlFor="firstName">ชื่อ</FieldLabel>
+                  <FieldLabel htmlFor="firstName">
+                    {t("common.firstName")}
+                  </FieldLabel>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -308,7 +312,9 @@ export default function TenantProfilePage() {
                   </div>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="lastName">นามสกุล</FieldLabel>
+                  <FieldLabel htmlFor="lastName">
+                    {t("common.lastName")}
+                  </FieldLabel>
                   <Input
                     id="lastName"
                     placeholder="นามสกุล"
@@ -321,7 +327,7 @@ export default function TenantProfilePage() {
                 </Field>
               </div>
               <Field>
-                <FieldLabel htmlFor="email">อีเมล</FieldLabel>
+                <FieldLabel htmlFor="email">{t("common.email")}</FieldLabel>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -338,7 +344,7 @@ export default function TenantProfilePage() {
                 </div>
               </Field>
               <Field>
-                <FieldLabel htmlFor="phone">เบอร์โทรศัพท์</FieldLabel>
+                <FieldLabel htmlFor="phone">{t("common.phone")}</FieldLabel>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -362,15 +368,15 @@ export default function TenantProfilePage() {
                 {profileLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    กำลังบันทึก...
+                    {t("common.loading")}
                   </>
                 ) : profileSuccess ? (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    บันทึกแล้ว
+                    <CheckCircle2 className="mr-2 h-4 w-4" />✓{" "}
+                    {t("common.save")}
                   </>
                 ) : (
-                  "บันทึกข้อมูล"
+                  t("common.save")
                 )}
               </Button>
             </FieldGroup>
@@ -385,11 +391,9 @@ export default function TenantProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Send className="h-5 w-5 text-[#2AABEE]" />
-            การแจ้งเตือน Telegram
+            {t("tenant.profile.telegram")}
           </CardTitle>
-          <CardDescription>
-            เชื่อมต่อ Telegram เพื่อรับแจ้งเตือนบิล การชำระเงิน และข่าวสารหอพัก
-          </CardDescription>
+          <CardDescription>{t("tenant.profile.telegramDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {tgLinked ? (
@@ -544,7 +548,7 @@ export default function TenantProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Shield className="h-5 w-5 text-primary" />
-            เปลี่ยนรหัสผ่าน
+            {t("tenant.profile.changePassword")}
           </CardTitle>
           <CardDescription>ควรใช้รหัสผ่านที่คาดเดาได้ยาก</CardDescription>
         </CardHeader>
@@ -553,7 +557,7 @@ export default function TenantProfilePage() {
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="currentPassword">
-                  รหัสผ่านปัจจุบัน
+                  {t("common.password")}
                 </FieldLabel>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -586,7 +590,9 @@ export default function TenantProfilePage() {
                 </div>
               </Field>
               <Field>
-                <FieldLabel htmlFor="newPassword">รหัสผ่านใหม่</FieldLabel>
+                <FieldLabel htmlFor="newPassword">
+                  {t("common.password") + " " + t("common.edit")}
+                </FieldLabel>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -628,7 +634,7 @@ export default function TenantProfilePage() {
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      ความแข็งแรง:{" "}
+                      {t("common.status")}:{" "}
                       <span className="font-medium text-foreground">
                         {strengthLabel}
                       </span>
@@ -638,7 +644,7 @@ export default function TenantProfilePage() {
               </Field>
               <Field>
                 <FieldLabel htmlFor="confirmPassword">
-                  ยืนยันรหัสผ่านใหม่
+                  {t("register.confirmPassword") || "ยืนยันรหัสผ่านใหม่"}
                 </FieldLabel>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -701,15 +707,15 @@ export default function TenantProfilePage() {
                 {passwordLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    กำลังเปลี่ยน...
+                    {t("common.loading")}
                   </>
                 ) : passwordSuccess ? (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
-                    เปลี่ยนแล้ว
+                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />✓{" "}
+                    {t("tenant.profile.passwordSuccess")}
                   </>
                 ) : (
-                  "เปลี่ยนรหัสผ่าน"
+                  t("tenant.profile.changePassword")
                 )}
               </Button>
             </FieldGroup>
