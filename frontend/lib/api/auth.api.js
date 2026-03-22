@@ -30,4 +30,8 @@ export const authAPI = {
 
   changePassword: (currentPassword, newPassword) =>
     api.put('/auth/change-password', { currentPassword, newPassword }).then((r) => r.data),
+
+  // OAuth user ตั้งรหัสผ่านครั้งแรก (ไม่ต้องใส่รหัสเดิม)
+  setPassword: (newPassword) =>
+    api.post('/auth/set-password', { newPassword }).then((r) => r.data),
 };

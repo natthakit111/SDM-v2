@@ -38,7 +38,6 @@ import {
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 
-/* ── Telegram API helpers ── */
 const telegramAPI = {
   getStatus: () => api.get("/telegram/status"),
   generateLink: () => api.post("/telegram/generate-link"),
@@ -48,6 +47,9 @@ const telegramAPI = {
 export default function TenantProfilePage() {
   const { user } = useAuth();
   const { t } = useLanguage();
+
+  const hasPassword = !!(user as any)?.has_password;
+  const oauthProvider = (user as any)?.oauth_provider ?? null;
 
   /* ── Profile state ── */
   const [profile, setProfile] = useState({
@@ -91,7 +93,6 @@ export default function TenantProfilePage() {
       email: user.email || "",
       phone: user.phone || "",
     });
-    // load telegram status
     telegramAPI
       .getStatus()
       .then((r) => {
@@ -99,7 +100,6 @@ export default function TenantProfilePage() {
         setTgChatId(r.data?.data?.chat_id ?? null);
       })
       .catch(() => {});
-
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
@@ -156,7 +156,39 @@ export default function TenantProfilePage() {
     }
   };
 
-  /* ── Submit password ── */
+  /* ── Set password — OAuth user ครั้งแรก (ไม่ต้องใส่รหัสเดิม) ── */
+  const handleSetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      setPasswordError("รหัสผ่านทั้งสองช่องไม่ตรงกัน");
+      return;
+    }
+    if (passwords.newPassword.length < 6) {
+      setPasswordError("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      await (authAPI as any).setPassword(passwords.newPassword);
+      setPasswordSuccess(true);
+      setPasswords({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      toast.success(
+        "ตั้งรหัสผ่านสำเร็จ! ตอนนี้คุณสามารถ login ด้วย username ได้แล้ว",
+      );
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (err: any) {
+      setPasswordError(err.response?.data?.message ?? "เกิดข้อผิดพลาด");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  /* ── Change password — user ปกติ ── */
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError("");
@@ -191,26 +223,22 @@ export default function TenantProfilePage() {
     }
   };
 
-  /* ── Generate Telegram link ── */
+  /* ── Telegram ── */
   const handleGenerateLink = async () => {
     setTgLinkLoading(true);
     try {
       const res = await telegramAPI.generateLink();
       const link = res.data?.data?.deepLink;
       setTgDeepLink(link);
-
-      // Start polling ตรวจว่าเชื่อมแล้วหรือยัง (ทุก 3 วินาที นาน 10 นาที)
       setTgPolling(true);
       let attempts = 0;
       pollingRef.current = setInterval(async () => {
         attempts++;
         try {
-          const statusRes = await telegramAPI.getStatus();
-          const linked = statusRes.data?.data?.linked;
-          const chatId = statusRes.data?.data?.chat_id;
-          if (linked) {
+          const r = await telegramAPI.getStatus();
+          if (r.data?.data?.linked) {
             setTgLinked(true);
-            setTgChatId(chatId);
+            setTgChatId(r.data?.data?.chat_id);
             setTgDeepLink(null);
             setTgPolling(false);
             clearInterval(pollingRef.current!);
@@ -218,7 +246,6 @@ export default function TenantProfilePage() {
           }
         } catch {}
         if (attempts >= 200) {
-          // 10 นาที
           clearInterval(pollingRef.current!);
           setTgPolling(false);
         }
@@ -230,7 +257,6 @@ export default function TenantProfilePage() {
     }
   };
 
-  /* ── Unlink Telegram ── */
   const handleUnlink = async () => {
     setTgUnlinkLoading(true);
     try {
@@ -397,13 +423,12 @@ export default function TenantProfilePage() {
         </CardHeader>
         <CardContent>
           {tgLinked ? (
-            /* ── เชื่อมแล้ว ── */
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                 <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                 <div className="flex-1">
                   <p className="font-medium text-green-600 dark:text-green-400">
-                    เชื่อมต่อแล้ว
+                    {t("tenant.profile.telegramLinked")}
                   </p>
                   {tgChatId && (
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -431,39 +456,30 @@ export default function TenantProfilePage() {
                 ) : (
                   <>
                     <Unlink className="mr-2 h-4 w-4" />
-                    ยกเลิกการเชื่อมต่อ
+                    {t("tenant.profile.unlinkTelegram")}
                   </>
                 )}
               </Button>
             </div>
           ) : tgDeepLink ? (
-            /* ── รอ user กดลิงก์ ── */
             <div className="space-y-4">
               <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 space-y-3">
                 <p className="text-sm font-medium">วิธีเชื่อมต่อ:</p>
                 <ol className="text-sm text-muted-foreground space-y-1.5 list-none">
-                  <li className="flex items-start gap-2">
-                    <span className="bg-primary/20 text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">
-                      1
-                    </span>
-                    กดปุ่ม "เปิด Telegram" ด้านล่าง
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="bg-primary/20 text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">
-                      2
-                    </span>
-                    กด <strong>Start</strong> หรือ <strong>เริ่ม</strong> ใน
-                    Telegram
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="bg-primary/20 text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">
-                      3
-                    </span>
-                    กลับมาหน้านี้ — ระบบจะเชื่อมต่อให้อัตโนมัติ
-                  </li>
+                  {[
+                    'กดปุ่ม "เปิด Telegram" ด้านล่าง',
+                    "กด Start หรือ เริ่ม ใน Telegram",
+                    "กลับมาหน้านี้ — ระบบจะเชื่อมต่อให้อัตโนมัติ",
+                  ].map((step, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="bg-primary/20 text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
                 </ol>
               </div>
-
               <div className="flex gap-3">
                 <Button
                   asChild
@@ -488,7 +504,6 @@ export default function TenantProfilePage() {
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </div>
-
               {tgPolling && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -497,7 +512,6 @@ export default function TenantProfilePage() {
               )}
             </div>
           ) : (
-            /* ── ยังไม่เชื่อม ── */
             <div className="space-y-4">
               <div className="p-4 rounded-lg bg-muted/50 space-y-2">
                 <p className="text-sm text-muted-foreground">
@@ -510,11 +524,8 @@ export default function TenantProfilePage() {
                     "🔧 อัปเดตการแจ้งซ่อม",
                     "📢 ประกาศจากหอพัก",
                   ].map((item) => (
-                    <li
-                      key={item}
-                      className="flex items-center gap-2 text-muted-foreground"
-                    >
-                      <span>{item}</span>
+                    <li key={item} className="text-muted-foreground">
+                      {item}
                     </li>
                   ))}
                 </ul>
@@ -532,7 +543,7 @@ export default function TenantProfilePage() {
                 ) : (
                   <>
                     <LinkIcon className="mr-2 h-4 w-4" />
-                    เชื่อมต่อ Telegram
+                    {t("tenant.profile.connectTelegram")}
                   </>
                 )}
               </Button>
@@ -543,55 +554,67 @@ export default function TenantProfilePage() {
 
       <Separator />
 
-      {/* Change password */}
+      {/* Password section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Shield className="h-5 w-5 text-primary" />
-            {t("tenant.profile.changePassword")}
+            {hasPassword ? t("tenant.profile.changePassword") : "ตั้งรหัสผ่าน"}
           </CardTitle>
-          <CardDescription>ควรใช้รหัสผ่านที่คาดเดาได้ยาก</CardDescription>
+          <CardDescription>
+            {oauthProvider && !hasPassword
+              ? `คุณ login ด้วย ${oauthProvider === "google" ? "Google" : "Telegram"} — ตั้งรหัสผ่านเพื่อให้ login ด้วย username ได้ด้วย (ไม่บังคับ)`
+              : "ควรใช้รหัสผ่านที่คาดเดาได้ยาก"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handlePasswordSubmit}>
+          <form
+            onSubmit={
+              hasPassword ? handlePasswordSubmit : handleSetPasswordSubmit
+            }
+          >
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="currentPassword">
-                  {t("common.password")}
-                </FieldLabel>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="currentPassword"
-                    type={showCurrent ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={passwords.currentPassword}
-                    onChange={(e) =>
-                      setPasswords((p) => ({
-                        ...p,
-                        currentPassword: e.target.value,
-                      }))
-                    }
-                    disabled={passwordLoading}
-                    className="pl-9 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrent(!showCurrent)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
-                  >
-                    {showCurrent ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </Field>
+              {/* แสดงช่องรหัสเดิมเฉพาะ user ที่มีรหัสผ่านแล้ว */}
+              {hasPassword && (
+                <Field>
+                  <FieldLabel htmlFor="currentPassword">
+                    รหัสผ่านปัจจุบัน
+                  </FieldLabel>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="currentPassword"
+                      type={showCurrent ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={passwords.currentPassword}
+                      onChange={(e) =>
+                        setPasswords((p) => ({
+                          ...p,
+                          currentPassword: e.target.value,
+                        }))
+                      }
+                      disabled={passwordLoading}
+                      className="pl-9 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrent(!showCurrent)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      tabIndex={-1}
+                    >
+                      {showCurrent ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </Field>
+              )}
+
               <Field>
                 <FieldLabel htmlFor="newPassword">
-                  {t("common.password") + " " + t("common.edit")}
+                  {hasPassword ? "รหัสผ่านใหม่" : "รหัสผ่าน"}
                 </FieldLabel>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -634,7 +657,7 @@ export default function TenantProfilePage() {
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {t("common.status")}:{" "}
+                      ความแข็งแรง:{" "}
                       <span className="font-medium text-foreground">
                         {strengthLabel}
                       </span>
@@ -642,9 +665,10 @@ export default function TenantProfilePage() {
                   </div>
                 )}
               </Field>
+
               <Field>
                 <FieldLabel htmlFor="confirmPassword">
-                  {t("register.confirmPassword") || "ยืนยันรหัสผ่านใหม่"}
+                  ยืนยันรหัสผ่าน
                 </FieldLabel>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -686,17 +710,19 @@ export default function TenantProfilePage() {
                   </p>
                 )}
               </Field>
+
               {passwordError && (
                 <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>{passwordError}</span>
                 </div>
               )}
+
               <Button
                 type="submit"
                 disabled={
                   passwordLoading ||
-                  !passwords.currentPassword ||
+                  (hasPassword && !passwords.currentPassword) ||
                   !passwords.newPassword ||
                   !passwords.confirmPassword ||
                   passwords.newPassword !== passwords.confirmPassword
@@ -711,11 +737,13 @@ export default function TenantProfilePage() {
                   </>
                 ) : passwordSuccess ? (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />✓{" "}
-                    {t("tenant.profile.passwordSuccess")}
+                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
+                    สำเร็จ!
                   </>
-                ) : (
+                ) : hasPassword ? (
                   t("tenant.profile.changePassword")
+                ) : (
+                  "ตั้งรหัสผ่าน"
                 )}
               </Button>
             </FieldGroup>
