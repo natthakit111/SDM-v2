@@ -7,6 +7,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api/axiosInstance";
 
 export type UserRole = "admin" | "tenant";
@@ -62,73 +63,106 @@ const mapUser = (backendUser: any): User => ({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const init = async () => {
+      // ── ตรวจ OAuth token จาก URL query param (?token=...) ──
+      // Google/Telegram callback จะแนบ token มาใน URL
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get("token");
+
+        if (urlToken) {
+          localStorage.setItem("token", urlToken);
+
+          // ลบ token ออกจาก URL โดยไม่ reload
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, "", cleanUrl);
+        }
+      }
+
+      // ── โหลด user จาก token ที่มีอยู่ (เดิม หรือจาก URL) ──
       const token = localStorage.getItem("token");
       if (token) {
         try {
           const res = await api.get("/auth/me");
           const backendUser = res.data.data ?? res.data.user ?? res.data;
-          setUser(mapUser(backendUser));
+          const mappedUser = mapUser(backendUser);
+          setUser(mappedUser);
+
+          // ถ้าอยู่ที่หน้า callback ให้ redirect ไป dashboard เลย
+          if (typeof window !== "undefined") {
+            const path = window.location.pathname;
+            if (
+              path.includes("/auth/google/callback") ||
+              path.includes("/auth/telegram/callback")
+            ) {
+              router.replace(
+                mappedUser.role === "admin" ? "/admin" : "/tenant",
+              );
+            }
+          }
         } catch {
           localStorage.removeItem("token");
-          setUser(null); 
+          setUser(null);
         }
       }
+
       setIsLoading(false);
     };
+
     init();
   }, []);
 
-const login = async (
-  username: string,
-  password: string,
-  rememberMe: boolean,
-) => {
-  try {
-    const res = await api.post("/auth/login", {
-      username,
-      password,
-      rememberMe,
-    });
+  const login = async (
+    username: string,
+    password: string,
+    rememberMe: boolean,
+  ) => {
+    try {
+      const res = await api.post("/auth/login", {
+        username,
+        password,
+        rememberMe,
+      });
 
-    const payload = res.data.data;
-    const token = payload?.token;
-    const backendUser = payload?.user;
+      const payload = res.data.data;
+      const token = payload?.token;
+      const backendUser = payload?.user;
 
-    if (!token) {
-      return { success: false, error: "ไม่ได้รับ token จาก server" };
+      if (!token) {
+        return { success: false, error: "ไม่ได้รับ token จาก server" };
+      }
+
+      localStorage.setItem("token", token);
+
+      let mappedUser: User;
+      if (backendUser) {
+        mappedUser = mapUser(backendUser);
+      } else {
+        const meRes = await api.get("/auth/me");
+        const meUser = meRes.data.data ?? meRes.data.user ?? meRes.data;
+        mappedUser = mapUser(meUser);
+      }
+
+      setUser(mappedUser);
+      return { success: true, user: mappedUser };
+    } catch (err: any) {
+      const message =
+        err.response?.data?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
+      return { success: false, error: message };
     }
-
-    localStorage.setItem("token", token);
-
-    let mappedUser: User;
-    if (backendUser) {
-      mappedUser = mapUser(backendUser);
-    } else {
-      const meRes = await api.get("/auth/me");
-      const meUser = meRes.data.data ?? meRes.data.user ?? meRes.data;
-      mappedUser = mapUser(meUser);
-    }
-
-    setUser(mappedUser);
-    return { success: true, user: mappedUser };
-  } catch (err: any) {
-    const message =
-      err.response?.data?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
-    return { success: false, error: message };
-  }
-};
+  };
 
   const register = async (data: RegisterData) => {
     try {
       await api.post("/auth/register", {
         username: data.username,
         password: data.password,
-        name: data.name, // ✅ แก้ไข: เพิ่ม name
-        email: data.email, // ✅ แก้ไข: เพิ่ม email
-        phone: data.phone, // ✅ แก้ไข: เพิ่ม phone
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
         role: "tenant",
       });
       return { success: true };
