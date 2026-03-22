@@ -1120,6 +1120,46 @@ const translations: Record<string, { th: string; en: string }> = {
     en: "Already has pending request",
   },
 
+  // ── Tenant Profile ─────────────────────────────────────────────────────────
+  "tenant.profile.title": { th: "โปรไฟล์", en: "Profile" },
+  "tenant.profile.subtitle": {
+    th: "จัดการข้อมูลส่วนตัวของคุณ",
+    en: "Manage your personal information",
+  },
+  "tenant.profile.personalInfo": {
+    th: "ข้อมูลส่วนตัว",
+    en: "Personal Information",
+  },
+  "tenant.profile.changePassword": {
+    th: "เปลี่ยนรหัสผ่าน",
+    en: "Change Password",
+  },
+  "tenant.profile.telegram": {
+    th: "การแจ้งเตือน Telegram",
+    en: "Telegram Notifications",
+  },
+  "tenant.profile.telegramDesc": {
+    th: "เชื่อมต่อ Telegram เพื่อรับแจ้งเตือน",
+    en: "Connect Telegram to receive notifications",
+  },
+  "tenant.profile.connectTelegram": {
+    th: "เชื่อมต่อ Telegram",
+    en: "Connect Telegram",
+  },
+  "tenant.profile.telegramLinked": { th: "เชื่อมต่อแล้ว", en: "Connected" },
+  "tenant.profile.unlinkTelegram": {
+    th: "ยกเลิกการเชื่อมต่อ",
+    en: "Disconnect",
+  },
+  "tenant.profile.saveSuccess": {
+    th: "บันทึกข้อมูลสำเร็จ",
+    en: "Profile saved successfully",
+  },
+  "tenant.profile.passwordSuccess": {
+    th: "เปลี่ยนรหัสผ่านสำเร็จ",
+    en: "Password changed successfully",
+  },
+
   // ── Notifications ──────────────────────────────────────────────────────────
   "notifications.title": { th: "แจ้งเตือน", en: "Notifications" },
   "notifications.unread": { th: "รายการที่ยังไม่ได้อ่าน", en: "unread items" },
