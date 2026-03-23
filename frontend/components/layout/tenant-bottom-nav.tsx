@@ -16,7 +16,7 @@ import { useNotification } from "@/context/notification-context";
 export function TenantBottomNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const { unreadCount } = useNotification();
+  const { hasUnread } = useNotification();
 
   const items = [
     { href: "/tenant", icon: LayoutDashboard, label: t("menu.dashboard") },
@@ -61,13 +61,11 @@ export function TenantBottomNav() {
                     isActive && "scale-110",
                   )}
                 />
-                {/* Badge สำหรับ bills และ payment */}
-                {unreadCount > 0 &&
+                {/* Dot badge สำหรับ bills และ payment */}
+                {hasUnread &&
                   (item.href === "/tenant/bills" ||
                     item.href === "/tenant/payment") && (
-                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-[9px] font-bold text-white flex items-center justify-center">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
                   )}
               </div>
               <span className="truncate max-w-[56px] text-center leading-tight">

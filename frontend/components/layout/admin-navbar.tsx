@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bell, LogOut, User, Settings } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
 import { paymentAPI } from "@/lib/api/payment.api";
 import { maintenanceAPI } from "@/lib/api/maintenance.api";
@@ -27,17 +28,24 @@ export function AdminNavbar() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    const ADMIN_KEY = "admin_notif_last_seen";
+    const lastSeen = localStorage.getItem(ADMIN_KEY);
+    const lastSeenDate = lastSeen ? new Date(lastSeen) : new Date(0);
+
     Promise.allSettled([
       paymentAPI.getAll({ status: "pending_verify" }),
       maintenanceAPI.getAll({ status: "pending" }),
     ]).then(([payRes, maintRes]) => {
-      const p =
-        payRes.status === "fulfilled" ? (payRes.value.data ?? []).length : 0;
-      const m =
-        maintRes.status === "fulfilled"
-          ? (maintRes.value.data ?? []).length
-          : 0;
-      setUnreadCount(p + m);
+      const payments =
+        payRes.status === "fulfilled" ? (payRes.value.data ?? []) : [];
+      const maintenance =
+        maintRes.status === "fulfilled" ? (maintRes.value.data ?? []) : [];
+
+      const hasNew = [...payments, ...maintenance].some((item: any) => {
+        const d = new Date(item.created_at || item.submitted_at || 0);
+        return d > lastSeenDate;
+      });
+      setUnreadCount(hasNew ? 1 : 0);
     });
   }, []);
 
@@ -66,17 +74,24 @@ export function AdminNavbar() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
+        <ThemeToggle variant="icon-only" />
+
         <Button
           variant="ghost"
           size="icon"
           className="relative shrink-0"
-          onClick={() => router.push("/admin/notifications")}
+          onClick={() => {
+            localStorage.setItem(
+              "admin_notif_last_seen",
+              new Date().toISOString(),
+            );
+            setUnreadCount(0);
+            router.push("/admin/notifications");
+          }}
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
           )}
         </Button>
 

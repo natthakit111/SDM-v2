@@ -6,43 +6,64 @@ import {
   useState,
   useEffect,
   ReactNode,
+  useCallback,
 } from "react";
 import { billAPI } from "@/lib/api/bill.api";
 import { useAuth } from "@/context/auth-context";
 
 interface NotificationContextType {
-  unreadCount: number;
+  hasUnread: boolean;
+  markAsRead: () => void;
   refresh: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
-  unreadCount: 0,
+  hasUnread: false,
+  markAsRead: () => {},
   refresh: () => {},
 });
 
+const STORAGE_KEY = "tenant_notif_last_seen";
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [hasUnread, setHasUnread] = useState(false);
 
-  const fetchCount = () => {
+  const fetchAndCheck = useCallback(() => {
     if (!user) return;
+
+    const lastSeen = localStorage.getItem(`${STORAGE_KEY}_${user.id}`);
+    const lastSeenDate = lastSeen ? new Date(lastSeen) : new Date(0);
+
     billAPI
       .getMyBills()
       .then((r) => {
-        const pending = (r.data ?? []).filter(
-          (b: any) => b.status === "pending" || b.status === "overdue",
-        );
-        setUnreadCount(pending.length);
+        const bills = r.data ?? [];
+        // มีบิล pending/overdue ที่สร้างหลัง lastSeen ไหม
+        const hasNew = bills.some((b: any) => {
+          if (b.status !== "pending" && b.status !== "overdue") return false;
+          const createdAt = new Date(b.created_at || b.due_date || 0);
+          return createdAt > lastSeenDate;
+        });
+        setHasUnread(hasNew);
       })
       .catch(() => {});
-  };
+  }, [user]);
 
   useEffect(() => {
-    fetchCount();
+    fetchAndCheck();
+  }, [fetchAndCheck]);
+
+  const markAsRead = useCallback(() => {
+    if (!user) return;
+    localStorage.setItem(`${STORAGE_KEY}_${user.id}`, new Date().toISOString());
+    setHasUnread(false);
   }, [user]);
 
   return (
-    <NotificationContext.Provider value={{ unreadCount, refresh: fetchCount }}>
+    <NotificationContext.Provider
+      value={{ hasUnread, markAsRead, refresh: fetchAndCheck }}
+    >
       {children}
     </NotificationContext.Provider>
   );

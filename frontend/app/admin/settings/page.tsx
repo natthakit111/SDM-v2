@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -10,57 +10,137 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Save, Bell, Send, Copy, Check, Loader2 } from "lucide-react";
-import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Save,
+  Send,
+  Copy,
+  Check,
+  Loader2,
+  Building2,
+  Zap,
+  Droplets,
+  LinkIcon,
+  Unlink,
+  ExternalLink,
+  RefreshCw,
+  CheckCircle2,
+  Bell,
+} from "lucide-react";
 import { settingsAPI } from "@/lib/api/settings.api";
-import { telegramAPI } from "@/lib/api/telegram.api";
+import { utilityRateAPI } from "@/lib/api/utilityRate.api";
+import api from "@/lib/api/axiosInstance";
 import { useLanguage } from "@/context/language-context";
 import { useAuth } from "@/context/auth-context";
 
-export default function SettingsPage() {
-  const { t } = useLanguage();
-  const { user } = useAuth();
+const telegramAPI = {
+  getStatus: () => api.get("/telegram/status"),
+  generateLink: () => api.post("/telegram/generate-link"),
+  unlink: () => api.delete("/telegram/unlink"),
+  broadcast: (message: string) => api.post("/telegram/broadcast", { message }),
+};
 
+export default function SettingsPage() {
+  const { t, language } = useLanguage();
+  const { user } = useAuth();
   const [pageLoading, setPageLoading] = useState(true);
 
-  // ── Financial ─────────────────────────────────────────────
+  /* ── Dorm info ── */
+  const [dormName, setDormName] = useState("");
+  const [dormAddress, setDormAddress] = useState("");
+  const [adminPhone, setAdminPhone] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [savingDorm, setSavingDorm] = useState(false);
+
+  /* ── Financial ── */
   const [bankName, setBankName] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   const [bankAccountName, setBankAccountName] = useState("");
   const [savingFinancial, setSavingFinancial] = useState(false);
 
-  // ── Notifications ─────────────────────────────────────────
+  /* ── Notifications ── */
   const [notifyPayment, setNotifyPayment] = useState(true);
   const [notifyMaintenance, setNotifyMaintenance] = useState(true);
   const [notifyOverdue, setNotifyOverdue] = useState(true);
-  const [savingNotifications, setSavingNotifications] = useState(false);
+  const [savingNotif, setSavingNotif] = useState(false);
 
-  // ── Telegram ──────────────────────────────────────────────
-  const [telegramChatId, setTelegramChatId] = useState("");
-  const [isTelegramConnected, setIsTelegramConnected] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const [linkingTelegram, setLinkingTelegram] = useState(false);
+  /* ── Utility rates ── */
+  const [waterBillingType, setWaterBillingType] = useState<"unit" | "flat">(
+    "unit",
+  );
+  const [waterFlatRate, setWaterFlatRate] = useState("");
+  const [electricRate, setElectricRate] = useState("");
+  const [waterRate, setWaterRate] = useState("");
+  const [effectiveFrom, setEffectiveFrom] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [savingRates, setSavingRates] = useState(false);
+  const [currentRates, setCurrentRates] = useState<{
+    electric?: any;
+    water?: any;
+  }>({});
+
+  /* ── Telegram ── */
+  const [tgLinked, setTgLinked] = useState(false);
+  const [tgChatId, setTgChatId] = useState<string | null>(null);
+  const [tgDeepLink, setTgDeepLink] = useState<string | null>(null);
+  const [tgLinkLoading, setTgLinkLoading] = useState(false);
+  const [tgPolling, setTgPolling] = useState(false);
+  const [tgUnlinkLoading, setTgUnlinkLoading] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [broadcasting, setBroadcasting] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "";
 
-  // ── Load settings on mount ────────────────────────────────
+  /* ── Load all ── */
   const loadSettings = useCallback(async () => {
     try {
       setPageLoading(true);
-      const res = await settingsAPI.getAll();
-      const s = res?.data ?? res ?? {};
-      setBankName(s.bank_name ?? "");
-      setBankAccount(s.bank_account ?? "");
-      setBankAccountName(s.bank_account_name ?? "");
-      setNotifyPayment(s.notify_payment !== "0");
-      setNotifyMaintenance(s.notify_maintenance !== "0");
-      setNotifyOverdue(s.notify_overdue !== "0");
+      const [settingsRes, ratesRes, tgRes] = await Promise.allSettled([
+        settingsAPI.getAll(),
+        utilityRateAPI.getCurrent(),
+        telegramAPI.getStatus(),
+      ]);
+
+      if (settingsRes.status === "fulfilled") {
+        const s = settingsRes.value?.data ?? settingsRes.value ?? {};
+        setDormName(s.dorm_name ?? "");
+        setDormAddress(s.dorm_address ?? "");
+        setAdminPhone(s.admin_phone ?? "");
+        setAdminEmail(s.admin_email ?? "");
+        setBankName(s.bank_name ?? "");
+        setBankAccount(s.bank_account ?? "");
+        setBankAccountName(s.bank_account_name ?? "");
+        setNotifyPayment(s.notify_payment !== "0");
+        setNotifyMaintenance(s.notify_maintenance !== "0");
+        setNotifyOverdue(s.notify_overdue !== "0");
+        setWaterBillingType(
+          (s.water_billing_type as "unit" | "flat") || "unit",
+        );
+        setWaterFlatRate(s.water_flat_rate ?? "");
+      }
+
+      if (ratesRes.status === "fulfilled") {
+        const r = ratesRes.value?.data ?? ratesRes.value ?? {};
+        setCurrentRates(r);
+        setElectricRate(r.electric?.rate_per_unit ?? "");
+        setWaterRate(r.water?.rate_per_unit ?? "");
+      }
+
+      if (tgRes.status === "fulfilled") {
+        const tg = tgRes.value?.data?.data ?? {};
+        setTgLinked(!!tg.linked);
+        setTgChatId(tg.chat_id ?? null);
+      }
     } catch {
-      toast.error(t("settings.loadError"));
+      toast.error(
+        language === "th" ? "โหลดข้อมูลไม่สำเร็จ" : "Failed to load settings",
+      );
     } finally {
       setPageLoading(false);
     }
@@ -68,94 +148,184 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings();
-    // ตรวจสอบสถานะ Telegram จาก user context
-    if (user?.telegramId) {
-      setIsTelegramConnected(true);
-      setTelegramChatId(String(user.telegramId));
-    }
-  }, [loadSettings, user]);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [loadSettings]);
 
-  // ── Handlers ──────────────────────────────────────────────
-  const handleSaveFinancial = async () => {
-    if (!bankName || !bankAccount || !bankAccountName) {
-      toast.error(t("settings.errorFillBank"));
-      return;
-    }
+  /* ── Save dorm ── */
+  const handleSaveDorm = async () => {
+    setSavingDorm(true);
     try {
-      setSavingFinancial(true);
+      await settingsAPI.update({
+        dorm_name: dormName,
+        dorm_address: dormAddress,
+        admin_phone: adminPhone,
+        admin_email: adminEmail,
+      });
+      toast.success(
+        language === "th" ? "บันทึกข้อมูลหอพักแล้ว" : "Dorm info saved",
+      );
+    } catch {
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
+    } finally {
+      setSavingDorm(false);
+    }
+  };
+
+  /* ── Save financial ── */
+  const handleSaveFinancial = async () => {
+    setSavingFinancial(true);
+    try {
       await settingsAPI.update({
         bank_name: bankName,
         bank_account: bankAccount,
         bank_account_name: bankAccountName,
       });
-      toast.success(t("settings.financialSaveSuccess"));
+      toast.success(
+        language === "th" ? "บันทึกข้อมูลธนาคารแล้ว" : "Bank info saved",
+      );
     } catch {
-      toast.error(t("settings.saveError"));
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
     } finally {
       setSavingFinancial(false);
     }
   };
 
-  const handleSaveNotifications = async () => {
+  /* ── Save notifications ── */
+  const handleSaveNotif = async () => {
+    setSavingNotif(true);
     try {
-      setSavingNotifications(true);
       await settingsAPI.update({
         notify_payment: notifyPayment ? "1" : "0",
         notify_maintenance: notifyMaintenance ? "1" : "0",
         notify_overdue: notifyOverdue ? "1" : "0",
       });
-      toast.success(t("settings.notifySaveSuccess"));
+      toast.success(
+        language === "th"
+          ? "บันทึกการแจ้งเตือนแล้ว"
+          : "Notification settings saved",
+      );
     } catch {
-      toast.error(t("settings.saveError"));
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
     } finally {
-      setSavingNotifications(false);
+      setSavingNotif(false);
     }
   };
 
-  const handleLinkTelegram = async () => {
-    if (!telegramChatId.trim()) {
-      toast.error(t("settings.tgChatIdRequired"));
+  /* ── Save utility rates ── */
+  const handleSaveRates = async () => {
+    if (!electricRate || !waterRate) {
+      toast.error(
+        language === "th" ? "กรุณากรอกให้ครบ" : "Please fill all fields",
+      );
       return;
     }
+    setSavingRates(true);
     try {
-      setLinkingTelegram(true);
-      await telegramAPI.linkAdmin(telegramChatId);
-      setIsTelegramConnected(true);
-      toast.success(t("settings.telegramConnected"));
+      const promises: Promise<any>[] = [
+        utilityRateAPI.create({
+          utility_type: "electric",
+          rate_per_unit: parseFloat(electricRate),
+          effective_from: effectiveFrom,
+        }),
+        settingsAPI.update({
+          water_billing_type: waterBillingType,
+          water_flat_rate: waterFlatRate,
+        }),
+      ];
+      // ถ้าคิดตามหน่วย ให้บันทึก water rate ด้วย
+      if (waterBillingType === "unit" && waterRate) {
+        promises.push(
+          utilityRateAPI.create({
+            utility_type: "water",
+            rate_per_unit: parseFloat(waterRate),
+            effective_from: effectiveFrom,
+          }),
+        );
+      }
+      await Promise.all(promises);
+      toast.success(
+        language === "th"
+          ? "บันทึกอัตราค่าสาธารณูปโภคแล้ว"
+          : "Utility rates saved",
+      );
+      loadSettings();
     } catch {
-      toast.error(t("settings.saveError"));
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
     } finally {
-      setLinkingTelegram(false);
+      setSavingRates(false);
     }
   };
 
-  const handleUnlinkTelegram = async () => {
-    if (!confirm(t("settings.telegramUnlinkConfirm"))) return;
+  /* ── Telegram generate link ── */
+  const handleGenerateLink = async () => {
+    setTgLinkLoading(true);
     try {
-      await telegramAPI.unlinkAdmin();
-      setIsTelegramConnected(false);
-      setTelegramChatId("");
-      toast.success(t("settings.telegramDisconnected"));
+      const res = await telegramAPI.generateLink();
+      const link = res.data?.data?.deepLink;
+      setTgDeepLink(link);
+      setTgPolling(true);
+      let attempts = 0;
+      pollingRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const r = await telegramAPI.getStatus();
+          if (r.data?.data?.linked) {
+            setTgLinked(true);
+            setTgChatId(r.data?.data?.chat_id);
+            setTgDeepLink(null);
+            setTgPolling(false);
+            clearInterval(pollingRef.current!);
+            toast.success(
+              language === "th"
+                ? "เชื่อมต่อ Telegram สำเร็จ! 🎉"
+                : "Telegram connected! 🎉",
+            );
+          }
+        } catch {}
+        if (attempts >= 200) {
+          clearInterval(pollingRef.current!);
+          setTgPolling(false);
+        }
+      }, 3000);
     } catch {
-      toast.error(t("settings.saveError"));
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
+    } finally {
+      setTgLinkLoading(false);
+    }
+  };
+
+  const handleUnlink = async () => {
+    setTgUnlinkLoading(true);
+    try {
+      await telegramAPI.unlink();
+      setTgLinked(false);
+      setTgChatId(null);
+      setTgDeepLink(null);
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      toast.success(
+        language === "th" ? "ยกเลิกการเชื่อมต่อแล้ว" : "Disconnected",
+      );
+    } catch {
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
+    } finally {
+      setTgUnlinkLoading(false);
     }
   };
 
   const handleBroadcast = async () => {
-    if (!broadcastMsg.trim()) {
-      toast.error(t("settings.telegramBroadcastRequired"));
-      return;
-    }
+    if (!broadcastMsg.trim()) return;
+    setBroadcasting(true);
     try {
-      setBroadcasting(true);
       const res = await telegramAPI.broadcast(broadcastMsg);
-      const count = res?.data?.sent ?? 0;
+      const count = res.data?.data?.sent ?? 0;
       toast.success(
-        t("settings.telegramBroadcastSuccess").replace("{n}", count),
+        language === "th" ? `ส่งแล้ว ${count} คน` : `Sent to ${count} tenants`,
       );
       setBroadcastMsg("");
     } catch {
-      toast.error(t("settings.telegramBroadcastError"));
+      toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "An error occurred");
     } finally {
       setBroadcasting(false);
     }
@@ -178,354 +348,570 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">{t("settings.title")}</h1>
-        <p className="text-muted-foreground mt-2">{t("settings.subtitle")}</p>
+        <h1 className="text-xl sm:text-2xl font-bold">{t("settings.title")}</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {t("settings.subtitle")}
+        </p>
       </div>
 
-      <Tabs defaultValue="financial" className="space-y-4">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
-          <TabsTrigger value="financial">
+      <Tabs defaultValue="dorm" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-1">
+          <TabsTrigger value="dorm" className="text-xs sm:text-sm">
+            <Building2 className="h-3.5 w-3.5 mr-1.5" />
+            {language === "th" ? "หอพัก" : "Dorm"}
+          </TabsTrigger>
+          <TabsTrigger value="financial" className="text-xs sm:text-sm">
             {t("settings.tabFinancial")}
           </TabsTrigger>
-          <TabsTrigger value="notifications">
+          <TabsTrigger value="utilities" className="text-xs sm:text-sm">
+            <Zap className="h-3.5 w-3.5 mr-1.5" />
+            {language === "th" ? "สาธารณูปโภค" : "Utilities"}
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="text-xs sm:text-sm">
+            <Bell className="h-3.5 w-3.5 mr-1.5" />
             {t("settings.tabNotifications")}
           </TabsTrigger>
-          <TabsTrigger value="telegram">Telegram</TabsTrigger>
+          <TabsTrigger
+            value="telegram"
+            className="text-xs sm:text-sm col-span-2 sm:col-span-1"
+          >
+            Telegram
+          </TabsTrigger>
         </TabsList>
 
-        {/* Financial */}
+        {/* ── Dorm Info ── */}
+        <TabsContent value="dorm">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                {language === "th" ? "ข้อมูลหอพัก" : "Dorm Information"}
+              </CardTitle>
+              <CardDescription>
+                {language === "th"
+                  ? "ข้อมูลที่แสดงในบิลและใบเสร็จ"
+                  : "Info shown on bills and receipts"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-sm font-medium">
+                    {language === "th" ? "ชื่อหอพัก" : "Dorm Name"}
+                  </label>
+                  <Input
+                    value={dormName}
+                    onChange={(e) => setDormName(e.target.value)}
+                    placeholder={
+                      language === "th"
+                        ? "เช่น หอพักสุขสบาย"
+                        : "e.g. Happy Dorm"
+                    }
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-sm font-medium">
+                    {language === "th" ? "ที่อยู่" : "Address"}
+                  </label>
+                  <Textarea
+                    value={dormAddress}
+                    onChange={(e) => setDormAddress(e.target.value)}
+                    placeholder={
+                      language === "th" ? "ที่อยู่หอพัก" : "Dorm address"
+                    }
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    {language === "th" ? "เบอร์ติดต่อ" : "Phone"}
+                  </label>
+                  <Input
+                    value={adminPhone}
+                    onChange={(e) => setAdminPhone(e.target.value)}
+                    placeholder="0xx-xxx-xxxx"
+                    type="tel"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    {language === "th" ? "อีเมล" : "Email"}
+                  </label>
+                  <Input
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="admin@email.com"
+                    type="email"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveDorm} disabled={savingDorm}>
+                {savingDorm ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {language === "th" ? "บันทึก" : "Save"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Financial ── */}
         <TabsContent value="financial">
           <Card>
             <CardHeader>
               <CardTitle>{t("settings.financialTitle")}</CardTitle>
               <CardDescription>{t("settings.financialDesc")}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    {t("settings.bankName")}
-                  </label>
-                  <Input
-                    placeholder={t("settings.bankName")}
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    {t("settings.bankAccount")}
-                  </label>
-                  <Input
-                    placeholder="123-456-789"
-                    value={bankAccount}
-                    onChange={(e) => setBankAccount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    {t("settings.bankAccountName")}
-                  </label>
-                  <Input
-                    placeholder={t("settings.bankAccountName")}
-                    value={bankAccountName}
-                    onChange={(e) => setBankAccountName(e.target.value)}
-                  />
-                </div>
+            <CardContent className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {t("settings.bankName")}
+                </label>
+                <Input
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder={t("settings.bankName")}
+                />
               </div>
-              <Button
-                onClick={handleSaveFinancial}
-                disabled={savingFinancial}
-                className="gap-2"
-              >
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {t("settings.bankAccount")}
+                </label>
+                <Input
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  placeholder="xxx-x-xxxxx-x"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {t("settings.bankAccountName")}
+                </label>
+                <Input
+                  value={bankAccountName}
+                  onChange={(e) => setBankAccountName(e.target.value)}
+                  placeholder={t("settings.bankAccountName")}
+                />
+              </div>
+              <Button onClick={handleSaveFinancial} disabled={savingFinancial}>
                 {savingFinancial ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="w-4 h-4" />
+                  <Save className="mr-2 h-4 w-4" />
                 )}
-                {t("settings.saveFinancial")}
+                {language === "th" ? "บันทึก" : "Save"}
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Notifications */}
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("settings.notifyTitle")}</CardTitle>
-              <CardDescription>{t("settings.notifyDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                {[
-                  {
-                    labelKey: "settings.notifyPayment",
-                    subKey: "settings.notifyPaymentSub",
-                    value: notifyPayment,
-                    onChange: setNotifyPayment,
-                    color: "text-primary",
-                  },
-                  {
-                    labelKey: "settings.notifyMaintenance",
-                    subKey: "settings.notifyMaintenanceSub",
-                    value: notifyMaintenance,
-                    onChange: setNotifyMaintenance,
-                    color: "text-primary",
-                  },
-                  {
-                    labelKey: "settings.notifyOverdue",
-                    subKey: "settings.notifyOverdueSub",
-                    value: notifyOverdue,
-                    onChange: setNotifyOverdue,
-                    color: "text-warning",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.labelKey}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Bell className={`w-5 h-5 ${item.color}`} />
-                      <div>
-                        <p className="font-medium">{t(item.labelKey)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {t(item.subKey)}
-                        </p>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={item.value}
-                      onChange={(e) => item.onChange(e.target.checked)}
-                      className="w-5 h-5 rounded border-input"
-                    />
-                  </div>
-                ))}
-              </div>
-              <Button
-                onClick={handleSaveNotifications}
-                disabled={savingNotifications}
-                className="gap-2"
-              >
-                {savingNotifications ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {t("settings.saveNotifications")}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Telegram */}
-        <TabsContent value="telegram" className="space-y-4">
-          {/* Step 1: Setup Bot */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-                  1
-                </span>
-                {t("settings.telegramStep1Title")}
-              </CardTitle>
-              <CardDescription>
-                {t("settings.telegramStep1Desc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                1. {t("settings.tgInstruct1")}{" "}
-                <span className="font-mono bg-muted px-1 rounded text-foreground">
-                  @BotFather
-                </span>{" "}
-                {t("settings.tgInstruct1b")}
-              </p>
-              <p>
-                2. {t("settings.tgInstruct2")}{" "}
-                <span className="font-mono bg-muted px-1 rounded text-foreground">
-                  /newbot
-                </span>
-              </p>
-              <p>3. {t("settings.tgInstruct3")}</p>
-              <p>
-                4. {t("settings.tgInstruct4")}{" "}
-                <span className="font-mono bg-muted px-1 rounded text-foreground">
-                  TELEGRAM_BOT_TOKEN=xxx
-                </span>
-              </p>
-
-              {botUsername && (
-                <div className="flex items-center gap-2 pt-2">
-                  <span>{t("settings.tgBotUsername")}:</span>
-                  <span className="font-mono bg-muted px-2 py-0.5 rounded text-foreground">
-                    @{botUsername}
+        {/* ── Utilities ── */}
+        <TabsContent value="utilities" className="space-y-4">
+          {/* Current rates */}
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="border-yellow-500/30 bg-yellow-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm font-medium">
+                    {language === "th"
+                      ? "ค่าไฟปัจจุบัน"
+                      : "Current Electric Rate"}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={copyBotLink}
-                  >
-                    {isCopied ? (
-                      <Check className="h-3 w-3 text-success" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <p className="text-2xl font-bold">
+                  ฿{currentRates.electric?.rate_per_unit ?? "-"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {language === "th" ? "ต่อหน่วย" : "per unit"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Droplets className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium">
+                    {language === "th"
+                      ? "ค่าน้ำปัจจุบัน"
+                      : "Current Water Rate"}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">
+                  ฿{currentRates.water?.rate_per_unit ?? "-"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {language === "th" ? "ต่อหน่วย" : "per unit"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Step 2: Link Admin */}
+          {/* Set new rates */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-                  2
-                </span>
-                {t("settings.telegramStep2Title")}
+              <CardTitle className="text-base">
+                {language === "th" ? "ตั้งอัตราใหม่" : "Set New Rates"}
               </CardTitle>
               <CardDescription>
-                {t("settings.telegramStep2Desc")}
+                {language === "th"
+                  ? "อัตราใหม่จะมีผลตั้งแต่วันที่กำหนด"
+                  : "New rates will apply from the specified date"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isTelegramConnected ? (
-                <div className="bg-success/10 border border-success/30 rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-success" />
-                    <div>
-                      <p className="font-medium text-sm text-success">
-                        {t("settings.telegramConnected")}
-                      </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                    {language === "th"
+                      ? "ค่าไฟ (บาท/หน่วย)"
+                      : "Electric (฿/unit)"}
+                  </label>
+                  <Input
+                    value={electricRate}
+                    onChange={(e) => setElectricRate(e.target.value)}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="7.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Droplets className="h-3.5 w-3.5 text-blue-500" />
+                    {language === "th" ? "ค่าน้ำ" : "Water"}
+                  </label>
+                  {/* Toggle unit / flat */}
+                  <div className="flex rounded-md border border-border overflow-hidden text-xs font-medium w-fit">
+                    <button
+                      onClick={() => setWaterBillingType("unit")}
+                      className={`px-3 py-1.5 transition-colors ${waterBillingType === "unit" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+                    >
+                      {language === "th" ? "ตามหน่วย" : "Per Unit"}
+                    </button>
+                    <button
+                      onClick={() => setWaterBillingType("flat")}
+                      className={`px-3 py-1.5 transition-colors border-l border-border ${waterBillingType === "flat" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+                    >
+                      {language === "th" ? "เหมาจ่าย" : "Flat Rate"}
+                    </button>
+                  </div>
+                  {waterBillingType === "unit" ? (
+                    <Input
+                      value={waterRate}
+                      onChange={(e) => setWaterRate(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="18.00"
+                    />
+                  ) : (
+                    <div className="space-y-1">
+                      <Input
+                        value={waterFlatRate}
+                        onChange={(e) => setWaterFlatRate(e.target.value)}
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="200"
+                      />
                       <p className="text-xs text-muted-foreground">
-                        Chat ID: {telegramChatId}
+                        {language === "th"
+                          ? "บาท/เดือน (ไม่คิดตามหน่วย)"
+                          : "฿/month (regardless of usage)"}
                       </p>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    {language === "th" ? "มีผลตั้งแต่" : "Effective From"}
+                  </label>
+                  <Input
+                    value={effectiveFrom}
+                    onChange={(e) => setEffectiveFrom(e.target.value)}
+                    type="date"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveRates} disabled={savingRates}>
+                {savingRates ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {language === "th" ? "บันทึกอัตราใหม่" : "Save New Rates"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Notifications ── */}
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.tabNotifications")}</CardTitle>
+              <CardDescription>
+                {language === "th"
+                  ? "เลือกประเภทการแจ้งเตือนที่ต้องการ"
+                  : "Choose notification types"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {[
+                {
+                  label:
+                    language === "th"
+                      ? "แจ้งเตือนเมื่อผู้เช่าชำระเงิน"
+                      : "Notify on tenant payment",
+                  value: notifyPayment,
+                  set: setNotifyPayment,
+                },
+                {
+                  label:
+                    language === "th"
+                      ? "แจ้งเตือนเมื่อมีคำขอแจ้งซ่อม"
+                      : "Notify on maintenance request",
+                  value: notifyMaintenance,
+                  set: setNotifyMaintenance,
+                },
+                {
+                  label:
+                    language === "th"
+                      ? "แจ้งเตือนเมื่อบิลเกินกำหนด"
+                      : "Notify on overdue bills",
+                  value: notifyOverdue,
+                  set: setNotifyOverdue,
+                },
+              ].map(({ label, value, set }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <label className="text-sm font-medium">{label}</label>
+                  <Switch checked={value} onCheckedChange={set} />
+                </div>
+              ))}
+              <Button onClick={handleSaveNotif} disabled={savingNotif}>
+                {savingNotif ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {language === "th" ? "บันทึก" : "Save"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Telegram ── */}
+        <TabsContent value="telegram" className="space-y-4">
+          {/* Link admin account */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {language === "th"
+                  ? "เชื่อมบัญชี Telegram ของ Admin"
+                  : "Link Admin Telegram Account"}
+              </CardTitle>
+              <CardDescription>
+                {language === "th"
+                  ? "รับแจ้งเตือนการชำระเงินและคำขอแจ้งซ่อม"
+                  : "Receive payment and maintenance notifications"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tgLinked ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-green-600 dark:text-green-400">
+                        {language === "th" ? "เชื่อมต่อแล้ว" : "Connected"}
+                      </p>
+                      {tgChatId && (
+                        <p className="text-xs text-muted-foreground">
+                          Chat ID: {tgChatId}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleUnlinkTelegram}
-                    className="text-destructive border-destructive hover:bg-destructive/10"
+                    onClick={handleUnlink}
+                    disabled={tgUnlinkLoading}
+                    className="text-destructive border-destructive/30 hover:bg-destructive/10"
                   >
-                    {t("settings.telegramUnlink")}
+                    {tgUnlinkLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {language === "th"
+                          ? "กำลังยกเลิก..."
+                          : "Disconnecting..."}
+                      </>
+                    ) : (
+                      <>
+                        <Unlink className="mr-2 h-4 w-4" />
+                        {language === "th"
+                          ? "ยกเลิกการเชื่อมต่อ"
+                          : "Disconnect"}
+                      </>
+                    )}
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p>{t("settings.tgLinkHowTo")}</p>
-                    <p>
-                      1. {t("settings.tgLinkStep1")}{" "}
-                      {botUsername && (
-                        <span className="font-mono bg-muted px-1 rounded text-foreground">
-                          @{botUsername}
-                        </span>
-                      )}
+              ) : tgDeepLink ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 space-y-2">
+                    <p className="text-sm font-medium">
+                      {language === "th" ? "วิธีเชื่อมต่อ:" : "How to connect:"}
                     </p>
-                    <p>
-                      2. {t("settings.tgLinkStep2")}{" "}
-                      <span className="font-mono bg-muted px-1 rounded text-foreground">
-                        /start {user?.username}
-                      </span>
-                    </p>
-                    <p>
-                      3. {t("settings.tgLinkStep3")}{" "}
-                      <span className="font-mono bg-muted px-1 rounded text-foreground">
-                        @userinfobot
-                      </span>
-                    </p>
+                    <ol className="text-sm text-muted-foreground space-y-1 list-none">
+                      {(language === "th"
+                        ? [
+                            "กดปุ่ม 'เปิด Telegram' ด้านล่าง",
+                            "กด Start ใน Telegram",
+                            "กลับมาหน้านี้ — จะเชื่อมต่ออัตโนมัติ",
+                          ]
+                        : [
+                            "Tap 'Open Telegram' below",
+                            "Tap Start in Telegram",
+                            "Return here — will connect automatically",
+                          ]
+                      ).map((step, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="bg-primary/20 text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">
+                            {i + 1}
+                          </span>
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={t("settings.tgChatIdPlaceholder")}
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                    />
+                  <div className="flex gap-3">
                     <Button
-                      onClick={handleLinkTelegram}
-                      disabled={linkingTelegram}
-                      className="gap-2 shrink-0"
+                      asChild
+                      className="flex-1 bg-[#2AABEE] hover:bg-[#2AABEE]/90"
                     >
-                      {linkingTelegram ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                      {t("settings.telegramLink")}
+                      <a
+                        href={tgDeepLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        {language === "th" ? "เปิด Telegram" : "Open Telegram"}
+                      </a>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleGenerateLink}
+                      disabled={tgLinkLoading}
+                      title={language === "th" ? "สร้างลิงก์ใหม่" : "New link"}
+                    >
+                      <RefreshCw className="h-4 w-4" />
                     </Button>
                   </div>
+                  {tgPolling && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {language === "th"
+                        ? "รอการเชื่อมต่อ... (ลิงก์หมดอายุใน 10 นาที)"
+                        : "Waiting for connection... (expires in 10 min)"}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <Button
+                  onClick={handleGenerateLink}
+                  disabled={tgLinkLoading}
+                  className="bg-[#2AABEE] hover:bg-[#2AABEE]/90"
+                >
+                  {tgLinkLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {language === "th"
+                        ? "กำลังสร้างลิงก์..."
+                        : "Creating link..."}
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="mr-2 h-4 w-4" />
+                      {language === "th"
+                        ? "เชื่อมต่อ Telegram"
+                        : "Connect Telegram"}
+                    </>
+                  )}
+                </Button>
               )}
             </CardContent>
           </Card>
 
-          {/* Step 3: Tenant Setup */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-                  3
+          {/* Bot info */}
+          {botUsername && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {language === "th" ? "ข้อมูล Bot" : "Bot Info"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Bot:</span>
+                <span className="font-mono bg-muted px-2 py-0.5 rounded text-sm">
+                  @{botUsername}
                 </span>
-                {t("settings.telegramStep3Title")}
-              </CardTitle>
-              <CardDescription>
-                {t("settings.telegramStep3Desc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-1">
-              <p>
-                1. {t("settings.tgTenantStep1")}{" "}
-                {botUsername && (
-                  <span className="font-mono bg-muted px-1 rounded text-foreground">
-                    @{botUsername}
-                  </span>
-                )}
-              </p>
-              <p>
-                2. {t("settings.tgTenantStep2")}{" "}
-                <span className="font-mono bg-muted px-1 rounded text-foreground">
-                  /start [username]
-                </span>{" "}
-                {t("settings.tgTenantStep2b")}
-              </p>
-              <p>3. {t("settings.tgTenantStep3")}</p>
-            </CardContent>
-          </Card>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={copyBotLink}
+                >
+                  {isCopied ? (
+                    <Check className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Broadcast */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Send className="h-4 w-4" />
-                {t("settings.telegramBroadcastTitle")}
+                {language === "th"
+                  ? "ส่งข้อความถึงผู้เช่าทุกคน"
+                  : "Broadcast to All Tenants"}
               </CardTitle>
               <CardDescription>
-                {t("settings.telegramBroadcastDesc")}
+                {language === "th"
+                  ? "ส่งข้อความผ่าน Telegram ไปยังผู้เช่าทุกคนที่เชื่อมต่อแล้ว"
+                  : "Send Telegram message to all connected tenants"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <textarea
-                className="w-full min-h-[100px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder={t("settings.telegramBroadcastPlaceholder")}
+              <Textarea
                 value={broadcastMsg}
                 onChange={(e) => setBroadcastMsg(e.target.value)}
+                placeholder={
+                  language === "th"
+                    ? "พิมพ์ข้อความที่จะส่ง..."
+                    : "Type your message..."
+                }
+                rows={4}
               />
               <Button
                 onClick={handleBroadcast}
-                disabled={broadcasting}
-                className="gap-2"
+                disabled={broadcasting || !broadcastMsg.trim()}
               >
                 {broadcasting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <Send className="mr-2 h-4 w-4" />
                 )}
-                {t("settings.telegramBroadcastSend")}
+                {language === "th" ? "ส่งข้อความ" : "Send Message"}
               </Button>
             </CardContent>
           </Card>

@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Building2,
@@ -31,10 +32,12 @@ import {
   UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const { t, language, setLanguage } = useLanguage();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   const menuItems = [
     {
@@ -108,7 +111,8 @@ export function AdminSidebar() {
               {group.items.map((item) => {
                 const isActive =
                   pathname === item.href ||
-                  (item.href !== "/admin" && pathname.startsWith(item.href));
+                  (item.href !== "/admin" &&
+                    pathname.startsWith(item.href + "/"));
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -116,7 +120,10 @@ export function AdminSidebar() {
                       isActive={isActive}
                       className={cn(isActive && "bg-primary/20 text-primary")}
                     >
-                      <Link href={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                      >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
@@ -131,6 +138,16 @@ export function AdminSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
+          {/* Theme Toggle */}
+          <SidebarMenuItem>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <span className="text-sm text-muted-foreground flex-1">
+                {language === "th" ? "ธีม" : "Theme"}
+              </span>
+              <ThemeToggle variant="dropdown" />
+            </div>
+          </SidebarMenuItem>
+
           {/* Language Toggle */}
           <SidebarMenuItem>
             <div className="flex items-center gap-2 px-2 py-1.5">
@@ -174,7 +191,10 @@ export function AdminSidebar() {
                 pathname === "/admin/profile" && "bg-primary/20 text-primary",
               )}
             >
-              <Link href="/admin/profile">
+              <Link
+                href="/admin/profile"
+                onClick={() => isMobile && setOpenMobile(false)}
+              >
                 <UserCircle className="h-4 w-4" />
                 <span>{t("common.profile")}</span>
               </Link>
@@ -190,7 +210,10 @@ export function AdminSidebar() {
                 pathname === "/admin/settings" && "bg-primary/20 text-primary",
               )}
             >
-              <Link href="/admin/settings">
+              <Link
+                href="/admin/settings"
+                onClick={() => isMobile && setOpenMobile(false)}
+              >
                 <Settings className="h-4 w-4" />
                 <span>{t("menu.settings")}</span>
               </Link>

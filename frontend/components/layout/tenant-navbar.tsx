@@ -27,7 +27,7 @@ export function TenantNavbar() {
   const router = useRouter();
 
   const [roomNumber, setRoomNumber] = useState<string>("-");
-  const { unreadCount } = useNotification();
+  const { hasUnread, markAsRead } = useNotification();
 
   useEffect(() => {
     contractAPI
@@ -77,13 +77,14 @@ export function TenantNavbar() {
           variant="ghost"
           size="icon"
           className="relative shrink-0"
-          onClick={() => router.push("/tenant/notifications")}
+          onClick={() => {
+            markAsRead();
+            router.push("/tenant/notifications");
+          }}
         >
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
+          {hasUnread && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
           )}
         </Button>
 

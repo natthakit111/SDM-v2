@@ -1,3 +1,5 @@
+//admin/notifications/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -165,22 +167,26 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header — ✅ text-xl sm:text-2xl แทน text-3xl */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold">
             {t("notifications.title")} / {t("announcements.title")}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {announcements.length} {t("announcements.title")}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setTelegramOpen(true)}>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTelegramOpen(true)}
+          >
             <Send className="w-4 h-4 mr-2" />
             Telegram
           </Button>
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             {t("announcements.create")}
           </Button>
@@ -207,16 +213,16 @@ export default function NotificationsPage() {
             announcements.map((a) => (
               <div
                 key={a.announcement_id}
-                className="flex gap-4 p-4 rounded-lg border bg-card transition-all hover:bg-muted/30"
+                className="flex gap-3 p-4 rounded-lg border bg-card transition-all hover:bg-muted/30"
               >
                 <div
-                  className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${typeColors[a.target_audience] ?? typeColors.all}`}
+                  className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-sm ${typeColors[a.target_audience] ?? typeColors.all}`}
                 >
                   {typeEmoji[a.target_audience] ?? "📢"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start gap-2 flex-wrap">
-                    <h3 className="font-semibold">{a.title}</h3>
+                    <h3 className="font-semibold text-sm">{a.title}</h3>
                     {a.is_pinned && (
                       <Badge variant="secondary" className="text-xs">
                         {t("announcements.pinned")}
@@ -236,9 +242,9 @@ export default function NotificationsPage() {
                 </div>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => handleDelete(a.announcement_id)}
-                  className="text-destructive hover:text-destructive flex-shrink-0"
+                  className="text-destructive hover:text-destructive flex-shrink-0 h-8 w-8"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

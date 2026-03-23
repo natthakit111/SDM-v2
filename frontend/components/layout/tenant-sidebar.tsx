@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Building2,
@@ -33,6 +34,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export function TenantSidebar() {
   const pathname = usePathname();
   const { t, language, setLanguage } = useLanguage();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   const menuItems = [
     {
@@ -127,7 +129,10 @@ export function TenantSidebar() {
                       isActive={isActive}
                       className={cn(isActive && "bg-primary/20 text-primary")}
                     >
-                      <Link href={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                      >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>

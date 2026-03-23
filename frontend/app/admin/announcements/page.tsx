@@ -1,3 +1,5 @@
+//frontend/app/admin/announcements/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
