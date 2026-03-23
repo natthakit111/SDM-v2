@@ -237,7 +237,18 @@ export default function BillsPage() {
       resetForm();
       fetchBills();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? t("common.noData"));
+      const data = err?.response?.data;
+      const errorCode: string | undefined = data?.error_code;
+      const errorMsg = errorCode
+        ? t(errorCode)
+        : (data?.message ?? t("common.error"));
+      const isMeterError =
+        errorCode === "bills.error.noElectricMeter" ||
+        errorCode === "bills.error.noWaterMeter";
+      toast.error(errorMsg, {
+        description: isMeterError ? t("bills.error.meterHint") : undefined,
+        duration: 6000,
+      });
     } finally {
       setSubmitting(false);
     }

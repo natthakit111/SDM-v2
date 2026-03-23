@@ -1211,6 +1211,28 @@ const translations: Record<string, { th: string; en: string }> = {
     en: "Dormitory announcements will appear here",
   },
 
+  // ── Bill Errors ────────────────────────────────────────────────────────────
+  "bills.error.noElectricMeter": {
+    th: "ยังไม่ได้บันทึกค่ามิเตอร์ไฟฟ้า กรุณาไปบันทึกมิเตอร์ก่อน แล้วค่อยสร้างบิล",
+    en: "Electric meter reading not recorded yet. Please record the meter reading first.",
+  },
+  "bills.error.noWaterMeter": {
+    th: "ยังไม่ได้บันทึกค่ามิเตอร์น้ำ กรุณาไปบันทึกมิเตอร์ก่อน แล้วค่อยสร้างบิล",
+    en: "Water meter reading not recorded yet. Please record the meter reading first.",
+  },
+  "bills.error.noContract": {
+    th: "ห้องนี้ยังไม่มีผู้เช่า หรือสัญญาเช่าหมดอายุแล้ว",
+    en: "This room has no active tenant or the contract has expired.",
+  },
+  "bills.error.alreadyExists": {
+    th: "บิลของห้องนี้ในเดือนที่เลือกถูกสร้างไปแล้ว",
+    en: "A bill for this room in the selected month already exists.",
+  },
+  "bills.error.meterHint": {
+    th: "ไปที่เมนู 'บันทึกมิเตอร์' เพื่อบันทึกค่าก่อน",
+    en: "Go to 'Meter Readings' menu to record the values first.",
+  },
+
   // ── Months ─────────────────────────────────────────────────────────────────
   "month.1": { th: "มกราคม", en: "January" },
   "month.2": { th: "กุมภาพันธ์", en: "February" },

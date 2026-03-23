@@ -30,7 +30,6 @@ const getMyBills = async (req, res, next) => {
 
 const getBillById = async (req, res, next) => {
   try {
-    // JOIN meter_readings ด้วย
     const bill = await BillModel.findByIdWithMeters(req.params.id)
     if (!bill) return sendNotFound(res, 'Bill not found');
     if (req.user.role === 'tenant') {
@@ -63,6 +62,14 @@ const getBillQR = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// แปลง error จาก bill.service → error_code ที่ frontend ใช้ t() แปลได้
+function getBillErrorCode(message) {
+  if (!message) return null;
+  if (message.includes('Electric meter reading not found')) return 'bills.error.noElectricMeter';
+  if (message.includes('Water meter reading not found'))    return 'bills.error.noWaterMeter';
+  return null;
+}
+
 const generateBill = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -72,17 +79,20 @@ const generateBill = async (req, res, next) => {
 
     const existingBill = await BillModel.findByRoomMonthYear(room_id, month, year);
     if (existingBill) {
-      return sendBadRequest(res, `Bill for room ${room_id} — ${month}/${year} already exists (bill_id: ${existingBill.bill_id})`);
+      return res.status(400).json({ success: false, error_code: 'bills.error.alreadyExists', message: 'Bill already exists' });
     }
 
     const contract = await ContractModel.findActiveByRoom(room_id);
-    if (!contract) return sendBadRequest(res, `Room ${room_id} has no active contract`);
+    if (!contract) {
+      return res.status(400).json({ success: false, error_code: 'bills.error.noContract', message: 'No active contract' });
+    }
 
     let amounts;
     try {
       amounts = await calculateBill(room_id, month, year, parseFloat(contract.rent_amount), parseFloat(other_amount));
     } catch (calcErr) {
-      return sendBadRequest(res, calcErr.message);
+      const error_code = getBillErrorCode(calcErr.message);
+      return res.status(400).json({ success: false, error_code, message: calcErr.message });
     }
 
     const due_date = customDueDate || getDefaultDueDate(parseInt(month), parseInt(year));
@@ -101,8 +111,6 @@ const generateBill = async (req, res, next) => {
     });
 
     const newBill = await BillModel.findById(billId);
-
-    // ✅ Phase 5: Notify tenant via Telegram
     TelegramService.sendBillNotification(newBill).catch(() => {});
 
     return sendCreated(res, {
