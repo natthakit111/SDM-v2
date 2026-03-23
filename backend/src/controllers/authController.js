@@ -26,13 +26,45 @@ const register = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendBadRequest(res, 'Validation failed', errors.array());
 
-    const { username, password, role = 'tenant' } = req.body;
+    const { username, password, role = 'tenant', name, email, phone } = req.body;
     const existing = await UserModel.findByUsername(username);
     if (existing) return sendBadRequest(res, 'Username is already taken');
 
+    // แยก name → first_name / last_name
+    const nameParts = (name || '').trim().split(' ');
+    const firstName = nameParts[0] || username;
+    const lastName  = nameParts.slice(1).join(' ') || '';
+
     const salt = await bcrypt.genSalt(12);
     const password_hash = await bcrypt.hash(password, salt);
-    const userId = await UserModel.createUser({ username, password_hash, role });
+
+    // สร้าง user พร้อม first_name/last_name/email/phone
+    const { pool } = require('../config/db');
+    const [userResult] = await pool.query(
+      `INSERT INTO users (username, password_hash, role, first_name, last_name, email, phone, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      [username, password_hash, role, firstName, lastName || null, email || null, phone || null]
+    );
+    const userId = userResult.insertId;
+
+    // สร้าง tenant record อัตโนมัติ (ถ้า role = tenant)
+    if (role === 'tenant') {
+      const { pool } = require('../config/db');
+      const placeholderIdCard = `REG${String(userId).padStart(9, '0')}`;
+      await pool.query(
+        `INSERT IGNORE INTO tenants
+           (user_id, first_name, last_name, id_card_number, phone, email)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          firstName,
+          lastName || 'ไม่ระบุ',
+          placeholderIdCard,
+          phone || '0000000000',
+          email || null,
+        ]
+      );
+    }
 
     return sendCreated(res, { user_id: userId, username, role }, 'Account registered successfully');
   } catch (err) { next(err); }
