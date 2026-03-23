@@ -113,6 +113,10 @@ export default function MetersPage() {
     electric: 0,
     water: 0,
   });
+  const [waterBillingType, setWaterBillingType] = useState<"unit" | "flat">(
+    "unit",
+  );
+  const [waterFlatRate, setWaterFlatRate] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [monthFilter, setMonthFilter] = useState("all");
@@ -147,10 +151,15 @@ export default function MetersPage() {
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [readRes, roomRes, rateRes] = await Promise.all([
+      const [readRes, roomRes, rateRes, settingsRes] = await Promise.all([
         meterAPI.getAll(),
         roomAPI.getAll({ status: "occupied" }),
         utilityRateAPI.getCurrent(),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        })
+          .then((r) => r.json())
+          .catch(() => ({ data: {} })),
       ]);
       setReadings(readRes?.data ?? readRes ?? []);
       setRooms(roomRes?.data ?? roomRes ?? []);
@@ -159,6 +168,11 @@ export default function MetersPage() {
         electric: Number(rd.electric?.rate_per_unit ?? 0),
         water: Number(rd.water?.rate_per_unit ?? 0),
       });
+      const settings = settingsRes?.data ?? settingsRes ?? {};
+      setWaterBillingType(
+        settings.water_billing_type === "flat" ? "flat" : "unit",
+      );
+      setWaterFlatRate(Number(settings.water_flat_rate ?? 0));
     } catch {
       toast.error(t("meters.loadError"));
     } finally {
@@ -612,7 +626,6 @@ export default function MetersPage() {
                 </Select>
               </Field>
             </div>
-
             {/* Electricity */}
             <div className="p-4 bg-muted/50 rounded-lg space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -688,81 +701,103 @@ export default function MetersPage() {
                 )}
               </div>
             </div>
-
             {/* Water */}
-            <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Droplets className="h-4 w-4 text-blue-500" />
-                {t("meters.waterMeter")}
-                <span className="text-muted-foreground ml-auto text-xs">
-                  ({t("meters.rate")} {rates.water} {t("meters.bahtPerUnit")})
-                </span>
-                {(waterImage || waterPreview) && (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                )}
+            {waterBillingType === "flat" ? (
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-400">
+                  <Droplets className="h-4 w-4" />
+                  {t("meters.waterMeter")}
+                  <span className="ml-auto text-xs bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full">
+                    {t("meters.flatRate")}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {t("meters.flatRateDesc")}{" "}
+                  <span className="font-bold text-foreground">
+                    ฿{waterFlatRate}
+                  </span>{" "}
+                  {t("meters.perMonth")}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("meters.flatRateNoMeter")}
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel>{t("meters.previousUnit")}</FieldLabel>
-                  <Input
-                    type="number"
-                    value={waterPrev}
-                    onChange={(e) => setWaterPrev(e.target.value)}
-                    placeholder="0"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>{t("meters.currentUnit")}</FieldLabel>
-                  <Input
-                    type="number"
-                    value={waterCurr}
-                    onChange={(e) => setWaterCurr(e.target.value)}
-                    placeholder="0"
-                  />
-                </Field>
-              </div>
-              {/* รูปมิเตอร์น้ำ */}
-              <div className="space-y-2">
-                <FieldLabel>{t("meters.waterPhotoLabel")}</FieldLabel>
-                <input
-                  ref={waterRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleWaterImage}
-                />
-                {waterPreview ? (
-                  <div className="relative">
-                    <img
-                      src={waterPreview}
-                      alt={t("meters.waterMeter")}
-                      className="w-full h-32 object-cover rounded-lg"
+            ) : (
+              <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Droplets className="h-4 w-4 text-blue-500" />
+                  {t("meters.waterMeter")}
+                  <span className="text-muted-foreground ml-auto text-xs">
+                    ({t("meters.rate")} {rates.water} {t("meters.bahtPerUnit")})
+                  </span>
+                  {(waterImage || waterPreview) && (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel>{t("meters.previousUnit")}</FieldLabel>
+                    <Input
+                      type="number"
+                      value={waterPrev}
+                      onChange={(e) => setWaterPrev(e.target.value)}
+                      placeholder="0"
                     />
+                  </Field>
+                  <Field>
+                    <FieldLabel>{t("meters.currentUnit")}</FieldLabel>
+                    <Input
+                      type="number"
+                      value={waterCurr}
+                      onChange={(e) => setWaterCurr(e.target.value)}
+                      placeholder="0"
+                    />
+                  </Field>
+                </div>
+                {/* รูปมิเตอร์น้ำ */}
+                <div className="space-y-2">
+                  <FieldLabel>{t("meters.waterPhotoLabel")}</FieldLabel>
+                  <input
+                    ref={waterRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleWaterImage}
+                  />
+                  {waterPreview ? (
+                    <div className="relative">
+                      <img
+                        src={waterPreview}
+                        alt={t("meters.waterMeter")}
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => {
+                          setWaterImage(null);
+                          setWaterPreview(null);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => {
-                        setWaterImage(null);
-                        setWaterPreview(null);
-                      }}
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={() => waterRef.current?.click()}
                     >
-                      <X className="h-3 w-3" />
+                      <Camera className="h-4 w-4" />
+                      {t("meters.uploadWaterPhoto")}
                     </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-2"
-                    onClick={() => waterRef.current?.click()}
-                  >
-                    <Camera className="h-4 w-4" />
-                    {t("meters.uploadWaterPhoto")}
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}{" "}
+            {/* end waterBillingType */}
           </FieldGroup>
 
           <DialogFooter className="mt-6">

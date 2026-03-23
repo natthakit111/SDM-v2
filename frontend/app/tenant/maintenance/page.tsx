@@ -80,7 +80,7 @@ export default function TenantMaintenancePage() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!formData.category || formData.description.length < 10) {
+    if (!formData.category || !formData.description.trim()) {
       toast.error(t("settings.errorFillAll"));
       return;
     }

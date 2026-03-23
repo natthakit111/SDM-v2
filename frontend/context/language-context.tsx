@@ -541,6 +541,16 @@ const translations: Record<string, { th: string; en: string }> = {
     en: "Upload Water Meter Photo",
   },
   "meters.noPhoto": { th: "ไม่มีรูป", en: "No photo" },
+  "meters.flatRate": { th: "เหมาจ่าย", en: "Flat Rate" },
+  "meters.flatRateDesc": {
+    th: "ค่าน้ำเหมาจ่ายเดือนละ",
+    en: "Flat water rate per month:",
+  },
+  "meters.perMonth": { th: "บาท/เดือน", en: "THB/month" },
+  "meters.flatRateNoMeter": {
+    th: "ไม่ต้องบันทึกมิเตอร์น้ำ ระบบจะใช้ค่าเหมาจ่ายอัตโนมัติ",
+    en: "No water meter recording needed. The system will use the flat rate automatically.",
+  },
   "meters.photoDialogTitle": {
     th: "รูปมิเตอร์ห้อง",
     en: "Meter Photos — Room",
