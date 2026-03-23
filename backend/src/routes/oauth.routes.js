@@ -97,10 +97,28 @@ async function upsertOAuthUser({ provider, providerId, email, displayName }) {
      VALUES (?, '', 'tenant', ?, ?, ?, ?, ?, 1)`,
     [username, firstName, lastName, email || null, provider, String(providerId)]
   );
- 
+
+  const newUserId = result.insertId;
+
+  // Auto-create tenant record (ข้อมูลบางส่วนยังไม่มี — ให้กรอกเพิ่มในโปรไฟล์ภายหลัง)
+  const placeholderIdCard = `OAUTH${String(newUserId).padStart(8, '0')}`;
+  await pool.query(
+    `INSERT IGNORE INTO tenants
+       (user_id, first_name, last_name, id_card_number, phone, email)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      newUserId,
+      firstName || 'ไม่ระบุ',
+      lastName  || 'ไม่ระบุ',
+      placeholderIdCard,   // placeholder — แก้ได้ในหน้า profile
+      '0000000000',        // placeholder — แก้ได้ในหน้า profile
+      email || null,
+    ]
+  );
+
   const [newUser] = await pool.query(
     'SELECT * FROM users WHERE user_id = ? LIMIT 1',
-    [result.insertId]
+    [newUserId]
   );
   return newUser[0];
 }

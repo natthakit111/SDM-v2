@@ -2,7 +2,7 @@ smart_dormitory
 
 
 โครงสร้างหลัก
-SDM_v2
+.
 ├── README.md
 ├── backend
 │   ├── Dockerfile
@@ -41,6 +41,7 @@ SDM_v2
 │   │   │   ├── contract.model.js
 │   │   │   ├── maintenance.model.js
 │   │   │   ├── meter.model.js
+│   │   │   ├── passwordReset.model.js
 │   │   │   ├── payment.model.js
 │   │   │   ├── room.model.js
 │   │   │   ├── tenant.model.js
@@ -55,6 +56,7 @@ SDM_v2
 │   │   │   ├── maintenance.routes.js
 │   │   │   ├── meter.routes.js
 │   │   │   ├── moveOut.routes.js
+│   │   │   ├── oauth.routes.js
 │   │   │   ├── payment.routes.js
 │   │   │   ├── report.routes.js
 │   │   │   ├── room.routes.js
@@ -65,6 +67,7 @@ SDM_v2
 │   │   ├── services
 │   │   │   ├── bill.service.js
 │   │   │   ├── cron.service.js
+│   │   │   ├── email.service.js
 │   │   │   ├── qr.service.js
 │   │   │   └── telegram.service.js
 │   │   ├── utils
@@ -137,12 +140,23 @@ SDM_v2
     │   │   └── cron
     │   │       └── check-overdue
     │   │           └── route.ts
+    │   ├── auth
+    │   │   ├── google
+    │   │   │   └── callback
+    │   │   │       └── page.tsx
+    │   │   └── telegram
+    │   │       └── callback
+    │   │           └── page.tsx
+    │   ├── forgot-password
+    │   │   └── page.tsx
     │   ├── globals.css
     │   ├── layout.tsx
     │   ├── login
     │   │   └── page.tsx
     │   ├── page.tsx
     │   ├── register
+    │   │   └── page.tsx
+    │   ├── reset-password
     │   │   └── page.tsx
     │   └── tenant
     │       ├── announcements
@@ -161,7 +175,9 @@ SDM_v2
     │       ├── page.tsx
     │       ├── payment
     │       │   └── page.tsx
-    │       └── payment-history
+    │       ├── payment-history
+    │       │   └── page.tsx
+    │       └── profile
     │           └── page.tsx
     ├── components
     │   ├── common
@@ -170,6 +186,7 @@ SDM_v2
     │   ├── layout
     │   │   ├── admin-navbar.tsx
     │   │   ├── admin-sidebar.tsx
+    │   │   ├── tenant-bottom-nav.tsx
     │   │   ├── tenant-navbar.tsx
     │   │   └── tenant-sidebar.tsx
     │   ├── meters
@@ -178,6 +195,7 @@ SDM_v2
     │   │   ├── payment-slip-processor.tsx
     │   │   └── qr-code-display.tsx
     │   ├── theme-provider.tsx
+    │   ├── theme-toggle.tsx
     │   └── ui
     │       ├── accordion.tsx
     │       ├── alert-dialog.tsx
@@ -239,7 +257,8 @@ SDM_v2
     ├── components.json
     ├── context
     │   ├── auth-context.tsx
-    │   └── language-context.tsx
+    │   ├── language-context.tsx
+    │   └── notification-context.tsx
     ├── docs
     │   ├── CRON_SETUP.md
     │   └── PROJECT_STATUS.md
@@ -280,55 +299,7 @@ SDM_v2
     │   ├── icon.svg
     │   ├── placeholder-logo.png
     │   ├── placeholder-logo.svg
-    ├── next-env.d.ts
-    ├── next.config.mjs
-    ├── package.json
-    ├── pnpm-lock.yaml
-    ├── postcss.config.mjs
-    ├── proxy.ts
-    ├── public
-    │   ├── apple-icon.png
-    │   ├── icon-dark-32x32.png
-    │   ├── icon-light-32x32.png
-    │   ├── icon.svg
-    │   ├── placeholder-logo.png
-    │   ├── placeholder-logo.svg
-    ├── next.config.mjs
-    ├── package.json
-    ├── pnpm-lock.yaml
-    ├── postcss.config.mjs
-    ├── proxy.ts
-    ├── public
-    │   ├── apple-icon.png
-    │   ├── icon-dark-32x32.png
-    │   ├── icon-light-32x32.png
-    │   ├── icon.svg
-    │   ├── placeholder-logo.png
-    │   ├── placeholder-logo.svg
-    ├── postcss.config.mjs
-    ├── proxy.ts
-    ├── public
-    │   ├── apple-icon.png
-    │   ├── icon-dark-32x32.png
-    │   ├── icon-light-32x32.png
-    │   ├── icon.svg
-    │   ├── placeholder-logo.png
-    │   ├── placeholder-logo.svg
-    │   ├── apple-icon.png
-    │   ├── icon-dark-32x32.png
-    │   ├── icon-light-32x32.png
-    │   ├── icon.svg
-    │   ├── placeholder-logo.png
-    │   ├── placeholder-logo.svg
     │   ├── placeholder-user.jpg
-    │   ├── icon-light-32x32.png
-    │   ├── icon.svg
-    │   ├── placeholder-logo.png
-    │   ├── placeholder-logo.svg
-    │   ├── placeholder-user.jpg
-    │   ├── placeholder.jpg
-    │   ├── placeholder-user.jpg
-    │   ├── placeholder.jpg
     │   ├── placeholder.jpg
     │   └── placeholder.svg
     ├── styles
