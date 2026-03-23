@@ -295,6 +295,26 @@ const translations: Record<string, { th: string; en: string }> = {
   // ── Payments (admin shared) ────────────────────────────────────────────────
   "payment.loadError": { th: "โหลดข้อมูลไม่สำเร็จ", en: "Failed to load data" },
   "payment.actionError": { th: "เกิดข้อผิดพลาด", en: "An error occurred" },
+  "payment.error.alreadyPaid": {
+    th: "บิลนี้ชำระแล้ว",
+    en: "This bill has already been paid",
+  },
+  "payment.error.cancelled": {
+    th: "บิลนี้ถูกยกเลิกแล้ว",
+    en: "This bill has been cancelled",
+  },
+  "payment.error.pendingVerify": {
+    th: "มีสลิปรอตรวจสอบอยู่แล้ว กรุณารอแอดมินตรวจสอบก่อน",
+    en: "A slip is already pending verification. Please wait for admin to review.",
+  },
+  "payment.error.notYours": {
+    th: "บิลนี้ไม่ใช่ของคุณ",
+    en: "This bill does not belong to you",
+  },
+  "payment.success.submitted": {
+    th: "ส่งสลิปสำเร็จ รอแอดมินตรวจสอบ",
+    en: "Slip submitted. Awaiting admin verification.",
+  },
   "payment.searchPlaceholder": {
     th: "ค้นหา ชื่อ ห้อง บิล หรือ ID...",
     en: "Search name, room, bill or ID...",
@@ -1209,28 +1229,6 @@ const translations: Record<string, { th: string; en: string }> = {
   "empty.noAnnouncementsDesc": {
     th: "ประกาศจากหอพักจะแสดงที่นี่",
     en: "Dormitory announcements will appear here",
-  },
-
-  // ── Bill Errors ────────────────────────────────────────────────────────────
-  "bills.error.noElectricMeter": {
-    th: "ยังไม่ได้บันทึกค่ามิเตอร์ไฟฟ้า กรุณาไปบันทึกมิเตอร์ก่อน แล้วค่อยสร้างบิล",
-    en: "Electric meter reading not recorded yet. Please record the meter reading first.",
-  },
-  "bills.error.noWaterMeter": {
-    th: "ยังไม่ได้บันทึกค่ามิเตอร์น้ำ กรุณาไปบันทึกมิเตอร์ก่อน แล้วค่อยสร้างบิล",
-    en: "Water meter reading not recorded yet. Please record the meter reading first.",
-  },
-  "bills.error.noContract": {
-    th: "ห้องนี้ยังไม่มีผู้เช่า หรือสัญญาเช่าหมดอายุแล้ว",
-    en: "This room has no active tenant or the contract has expired.",
-  },
-  "bills.error.alreadyExists": {
-    th: "บิลของห้องนี้ในเดือนที่เลือกถูกสร้างไปแล้ว",
-    en: "A bill for this room in the selected month already exists.",
-  },
-  "bills.error.meterHint": {
-    th: "ไปที่เมนู 'บันทึกมิเตอร์' เพื่อบันทึกค่าก่อน",
-    en: "Go to 'Meter Readings' menu to record the values first.",
   },
 
   // ── Months ─────────────────────────────────────────────────────────────────

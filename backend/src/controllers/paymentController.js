@@ -38,6 +38,11 @@ const getPaymentById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// helper: ส่ง error พร้อม error_code ให้ frontend แปลได้
+const sendErrorWithCode = (res, statusCode, error_code, message) => {
+  return res.status(statusCode).json({ success: false, error_code, message });
+};
+
 const submitPayment = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -46,18 +51,19 @@ const submitPayment = async (req, res, next) => {
     const { bill_id, payment_method } = req.body;
     const bill = await BillModel.findById(bill_id);
     if (!bill)                       return sendNotFound(res, 'Bill not found');
-    if (bill.status === 'paid')      return sendBadRequest(res, 'This bill has already been paid');
-    if (bill.status === 'cancelled') return sendBadRequest(res, 'This bill is cancelled');
+    if (bill.status === 'paid')      return sendErrorWithCode(res, 400, 'payment.error.alreadyPaid', 'Bill already paid');
+    if (bill.status === 'cancelled') return sendErrorWithCode(res, 400, 'payment.error.cancelled', 'Bill cancelled');
 
     const tenant = await TenantModel.findByUserId(req.user.user_id);
     if (!tenant) return sendNotFound(res, 'Tenant profile not found');
-    if (tenant.tenant_id !== bill.tenant_id) return sendForbidden(res, 'This bill does not belong to you');
+    if (tenant.tenant_id !== bill.tenant_id)
+      return sendErrorWithCode(res, 403, 'payment.error.notYours', 'Bill does not belong to you');
 
     const existingPayments = await PaymentModel.findByBillId(bill_id);
     const hasPending = existingPayments.some(p => p.status === 'pending_verify');
-    if (hasPending) return sendBadRequest(res, 'A payment for this bill is already pending verification');
+    if (hasPending)
+      return sendErrorWithCode(res, 400, 'payment.error.pendingVerify', 'Payment already pending verification');
 
-    // ✅ Cloudinary: req.file.path คือ URL เต็ม ไม่ต้อง replace backslash
     const slip_image = req.file ? req.file.path : null;
 
     const paymentId = await PaymentModel.create({

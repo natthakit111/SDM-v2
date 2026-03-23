@@ -58,6 +58,9 @@ export default function TenantPaymentPage() {
   const billIdFromUrl = searchParams.get("bill");
 
   const [bills, setBills] = useState<Bill[]>([]);
+  const [pendingPaymentBillIds, setPendingPaymentBillIds] = useState<
+    Set<number>
+  >(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedBillId, setSelectedBillId] = useState<string>("");
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -74,32 +77,55 @@ export default function TenantPaymentPage() {
       day: "numeric",
     });
 
+  // โหลดบิล + payments พร้อมกัน
+  const loadData = async () => {
+    try {
+      const [billRes, paymentRes] = await Promise.all([
+        billAPI.getMyBills(),
+        paymentAPI.getMyPayments().catch(() => ({ data: [] })),
+      ]);
+      const billData: Bill[] = billRes.data ?? [];
+      setBills(billData);
+
+      // เก็บ bill_id ที่มี payment รอตรวจสอบอยู่แล้ว
+      const payments: any[] = paymentRes.data ?? [];
+      const pendingIds = new Set<number>(
+        payments
+          .filter((p) => p.status === "pending_verify")
+          .map((p) => Number(p.bill_id)),
+      );
+      setPendingPaymentBillIds(pendingIds);
+
+      // auto-select บิลที่ยังชำระได้
+      const actionable = billData.filter(
+        (b) =>
+          (b.status === "pending" || b.status === "overdue") &&
+          !pendingIds.has(b.bill_id),
+      );
+      if (billIdFromUrl) {
+        setSelectedBillId(billIdFromUrl);
+      } else if (actionable.length > 0) {
+        setSelectedBillId(String(actionable[0].bill_id));
+      }
+    } catch (err: any) {
+      if (err?.response?.status !== 404) {
+        toast.error(t("payment.loadError"));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    billAPI
-      .getMyBills()
-      .then((r) => {
-        const data: Bill[] = r.data ?? [];
-        setBills(data);
-        const pending = data.filter(
-          (b) => b.status === "pending" || b.status === "overdue",
-        );
-        if (billIdFromUrl) {
-          setSelectedBillId(billIdFromUrl);
-        } else if (pending.length > 0) {
-          setSelectedBillId(String(pending[0].bill_id));
-        }
-      })
-      .catch((err) => {
-        // 404 = ยังไม่มีบิล (user ใหม่) — ไม่ต้อง toast
-        if (err?.response?.status !== 404) {
-          toast.error(t("payment.loadError"));
-        }
-      })
-      .finally(() => setLoading(false));
+    loadData();
   }, [billIdFromUrl]);
 
   const pendingBills = bills.filter(
     (b) => b.status === "pending" || b.status === "overdue",
+  );
+  // บิลที่ยังชำระได้ = ยังไม่มีสลิป pending_verify
+  const actionableBills = pendingBills.filter(
+    (b) => !pendingPaymentBillIds.has(b.bill_id),
   );
   const totalDue = pendingBills.reduce((s, b) => s + Number(b.total_amount), 0);
   const selectedBill = bills.find((b) => String(b.bill_id) === selectedBillId);
@@ -124,14 +150,20 @@ export default function TenantPaymentPage() {
     try {
       await paymentAPI.submit(selectedBillId, slipFile, "qr_promptpay");
       setUploadDone(true);
-      setTimeout(() => {
+      toast.success(t("payment.success.submitted"));
+      setTimeout(async () => {
         setSlipDialogOpen(false);
         setUploadDone(false);
         setSlipFile(null);
-        billAPI.getMyBills().then((r) => setBills(r.data ?? []));
+        setLoading(true);
+        await loadData();
       }, 2000);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? t("payment.actionError"));
+      const data = err?.response?.data;
+      const errorCode: string | undefined = data?.error_code;
+      toast.error(
+        errorCode ? t(errorCode) : (data?.message ?? t("payment.actionError")),
+      );
     } finally {
       setUploading(false);
     }
@@ -141,7 +173,9 @@ export default function TenantPaymentPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">{t("tenant.payment.title")}</h1>
-        <p className="text-muted-foreground mt-2">{t("tenant.payment.subtitle")}</p>
+        <p className="text-muted-foreground mt-2">
+          {t("tenant.payment.subtitle")}
+        </p>
       </div>
 
       {loading ? (
@@ -190,154 +224,204 @@ export default function TenantPaymentPage() {
             </Card>
           </div>
 
-          {/* No pending bills — tenant ใหม่ */}
+          {/* ไม่มีบิลค้างชำระเลย */}
           {pendingBills.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-12 text-center">
                 <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
-                <p className="font-medium text-muted-foreground">{t("empty.noBills")}</p>
-                <p className="text-sm text-muted-foreground mt-1">{t("empty.noBillsDesc")}</p>
+                <p className="font-medium text-muted-foreground">
+                  {t("empty.noBills")}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t("empty.noBillsDesc")}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <>
-              {/* Select Bill */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("tenant.payment.selectBill")}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Select value={selectedBillId} onValueChange={setSelectedBillId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("tenant.payment.selectBill")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pendingBills.map((b) => (
-                        <SelectItem key={b.bill_id} value={String(b.bill_id)}>
-                          {t(`month.${b.bill_month}`)} {b.bill_year} — {fmt(b.total_amount)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {selectedBill && (
-                    <div className="text-sm text-muted-foreground">
-                      {t("bills.dueDate")} {fmtDate(selectedBill.due_date)} •{" "}
-                      {t("bills.totalAmount")}{" "}
-                      <span className="font-bold text-foreground">
-                        {fmt(selectedBill.total_amount)}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Select Bill — แสดงเฉพาะบิลที่ชำระได้ */}
+              {actionableBills.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("tenant.payment.selectBill")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Select
+                      value={selectedBillId}
+                      onValueChange={setSelectedBillId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={t("tenant.payment.selectBill")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {actionableBills.map((b) => (
+                          <SelectItem key={b.bill_id} value={String(b.bill_id)}>
+                            {t(`month.${b.bill_month}`)} {b.bill_year} —{" "}
+                            {fmt(b.total_amount)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedBill && (
+                      <div className="text-sm text-muted-foreground">
+                        {t("bills.dueDate")} {fmtDate(selectedBill.due_date)} •{" "}
+                        {t("bills.totalAmount")}{" "}
+                        <span className="font-bold text-foreground">
+                          {fmt(selectedBill.total_amount)}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Payment Methods */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("tenant.payment.methods")}</CardTitle>
-                  <CardDescription>{t("tenant.payment.afterPay")}</CardDescription>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
-                  {/* QR */}
-                  <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-                    <Button
-                      variant="outline"
-                      className="h-24 flex flex-col gap-2"
-                      onClick={handleOpenQR}
-                      disabled={!selectedBillId}
-                    >
-                      <QrCode className="w-6 h-6" />
-                      <span>{t("payments.qr")}</span>
-                      <span className="text-xs text-muted-foreground">PromptPay</span>
-                    </Button>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{t("payments.qr")}</DialogTitle>
-                        <DialogDescription>{t("tenant.payment.methods")}</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="bg-white p-6 rounded-lg flex items-center justify-center">
-                          {qrPayload ? (
-                            <QRCodeSVG value={qrPayload} size={240} />
-                          ) : (
-                            <QrCode className="w-48 h-48 text-gray-800" />
-                          )}
-                        </div>
-                        {selectedBill && (
-                          <p className="text-center font-bold text-lg">
-                            {fmt(selectedBill.total_amount)}
-                          </p>
-                        )}
-                        <p className="text-sm text-muted-foreground text-center">
-                          {t("tenant.payment.afterPay")}
-                        </p>
-                        <Button onClick={() => setQrDialogOpen(false)} className="w-full">
-                          {t("common.close")}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  {/* Upload Slip */}
-                  <Dialog open={slipDialogOpen} onOpenChange={setSlipDialogOpen}>
-                    <DialogTrigger asChild>
+              {actionableBills.length > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("tenant.payment.methods")}</CardTitle>
+                    <CardDescription>
+                      {t("tenant.payment.afterPay")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    {/* QR */}
+                    <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
                       <Button
                         variant="outline"
                         className="h-24 flex flex-col gap-2"
+                        onClick={handleOpenQR}
                         disabled={!selectedBillId}
                       >
-                        <Upload className="w-6 h-6" />
-                        <span>{t("payments.slip")}</span>
-                        <span className="text-xs text-muted-foreground">JPG/PNG</span>
+                        <QrCode className="w-6 h-6" />
+                        <span>{t("payments.qr")}</span>
+                        <span className="text-xs text-muted-foreground">
+                          PromptPay
+                        </span>
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{t("payments.slip")}</DialogTitle>
-                        <DialogDescription>{t("tenant.payment.afterPay")}</DialogDescription>
-                      </DialogHeader>
-                      {uploadDone ? (
-                        <div className="text-center py-8">
-                          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                          <p className="font-medium">{t("common.confirm")}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {t("status.pending_verify")}
-                          </p>
-                        </div>
-                      ) : (
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{t("payments.qr")}</DialogTitle>
+                          <DialogDescription>
+                            {t("tenant.payment.methods")}
+                          </DialogDescription>
+                        </DialogHeader>
                         <div className="space-y-4">
-                          <label
-                            htmlFor="slip-upload"
-                            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted block"
-                          >
-                            <Input
-                              id="slip-upload"
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => setSlipFile(e.target.files?.[0] ?? null)}
-                            />
-                            <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="font-medium">{slipFile?.name ?? t("common.upload")}</p>
-                            <p className="text-xs text-muted-foreground">JPG, PNG</p>
-                          </label>
+                          <div className="bg-white p-6 rounded-lg flex items-center justify-center">
+                            {qrPayload ? (
+                              <QRCodeSVG value={qrPayload} size={240} />
+                            ) : (
+                              <QrCode className="w-48 h-48 text-gray-800" />
+                            )}
+                          </div>
+                          {selectedBill && (
+                            <p className="text-center font-bold text-lg">
+                              {fmt(selectedBill.total_amount)}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground text-center">
+                            {t("tenant.payment.afterPay")}
+                          </p>
                           <Button
-                            onClick={handleSlipUpload}
-                            disabled={!slipFile || uploading}
+                            onClick={() => setQrDialogOpen(false)}
                             className="w-full"
                           >
-                            {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {t("common.confirm")}
+                            {t("common.close")}
                           </Button>
                         </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
+                      </DialogContent>
+                    </Dialog>
 
-              {/* Pending Bills List */}
+                    {/* Upload Slip */}
+                    <Dialog
+                      open={slipDialogOpen}
+                      onOpenChange={setSlipDialogOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="h-24 flex flex-col gap-2"
+                          disabled={!selectedBillId}
+                        >
+                          <Upload className="w-6 h-6" />
+                          <span>{t("payments.slip")}</span>
+                          <span className="text-xs text-muted-foreground">
+                            JPG/PNG
+                          </span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{t("payments.slip")}</DialogTitle>
+                          <DialogDescription>
+                            {t("tenant.payment.afterPay")}
+                          </DialogDescription>
+                        </DialogHeader>
+                        {uploadDone ? (
+                          <div className="text-center py-8">
+                            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                            <p className="font-medium">
+                              {t("payment.success.submitted")}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {t("status.pending_verify")}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <label
+                              htmlFor="slip-upload"
+                              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted block"
+                            >
+                              <Input
+                                id="slip-upload"
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) =>
+                                  setSlipFile(e.target.files?.[0] ?? null)
+                                }
+                              />
+                              <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="font-medium">
+                                {slipFile?.name ?? t("common.upload")}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                JPG, PNG
+                              </p>
+                            </label>
+                            <Button
+                              onClick={handleSlipUpload}
+                              disabled={!slipFile || uploading}
+                              className="w-full"
+                            >
+                              {uploading && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              )}
+                              {t("common.confirm")}
+                            </Button>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              ) : (
+                // ทุกบิลมีสลิปรอตรวจสอบแล้ว
+                <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
+                  <CardContent className="py-6 text-center">
+                    <CheckCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                    <p className="font-medium">{t("status.pending_verify")}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {t("payment.error.pendingVerify")}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* รายการบิลค้างชำระ */}
               <Card>
                 <CardHeader>
                   <CardTitle>{t("bills.list")}</CardTitle>
@@ -357,9 +441,15 @@ export default function TenantPaymentPage() {
                             {t("bills.dueDate")} {fmtDate(b.due_date)}
                           </p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end gap-1">
                           <p className="font-bold">{fmt(b.total_amount)}</p>
-                          <BillStatusBadge status={b.status} />
+                          {pendingPaymentBillIds.has(b.bill_id) ? (
+                            <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 px-2 py-0.5 rounded-full">
+                              {t("status.pending_verify")}
+                            </span>
+                          ) : (
+                            <BillStatusBadge status={b.status} />
+                          )}
                         </div>
                       </div>
                     ))}
