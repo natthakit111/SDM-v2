@@ -30,6 +30,6 @@ export const paymentAPI = {
   verify: (id) =>
     api.put(`/payments/${id}/verify`).then((r) => r.data),
 
-  reject: (id, reason) =>
-    api.put(`/payments/${id}/reject`, { reason }).then((r) => r.data),
+  reject: (id, remark) =>
+    api.put(`/payments/${id}/reject`, { remark }).then((r) => r.data),
 };
