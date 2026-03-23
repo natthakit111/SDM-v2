@@ -53,6 +53,7 @@ export default function SettingsPage() {
   const [dormAddress, setDormAddress] = useState("");
   const [adminPhone, setAdminPhone] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [numFloors, setNumFloors] = useState("5");
   const [savingDorm, setSavingDorm] = useState(false);
 
   /* ── Financial ── */
@@ -113,6 +114,7 @@ export default function SettingsPage() {
         setDormAddress(s.dorm_address ?? "");
         setAdminPhone(s.admin_phone ?? "");
         setAdminEmail(s.admin_email ?? "");
+        setNumFloors(s.num_floors ?? "5");
         setBankName(s.bank_name ?? "");
         setBankAccount(s.bank_account ?? "");
         setBankAccountName(s.bank_account_name ?? "");
@@ -162,6 +164,7 @@ export default function SettingsPage() {
         dorm_address: dormAddress,
         admin_phone: adminPhone,
         admin_email: adminEmail,
+        num_floors: numFloors,
       });
       toast.success(
         language === "th" ? "บันทึกข้อมูลหอพักแล้ว" : "Dorm info saved",
@@ -443,6 +446,24 @@ export default function SettingsPage() {
                     placeholder="admin@email.com"
                     type="email"
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    {language === "th" ? "จำนวนชั้น" : "Number of Floors"}
+                  </label>
+                  <Input
+                    value={numFloors}
+                    onChange={(e) => setNumFloors(e.target.value)}
+                    placeholder="5"
+                    type="number"
+                    min="1"
+                    max="50"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {language === "th"
+                      ? "ใช้สำหรับ dropdown ชั้นในฟอร์มเพิ่มห้อง"
+                      : "Used for floor dropdown when adding rooms"}
+                  </p>
                 </div>
               </div>
               <Button onClick={handleSaveDorm} disabled={savingDorm}>

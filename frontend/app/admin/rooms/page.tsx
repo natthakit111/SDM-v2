@@ -41,6 +41,7 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
 import { RoomStatusBadge } from "@/components/common/status-badge";
 import { Plus, Search, Pencil, Trash2, DoorOpen, Loader2 } from "lucide-react";
 import { roomAPI } from "@/lib/api/room.api";
+import { settingsAPI } from "@/lib/api/settings.api";
 import { toast } from "sonner";
 
 interface Room {
@@ -84,6 +85,7 @@ const formatCurrency = (n: number) =>
 export default function RoomsPage() {
   const { t } = useLanguage();
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [numFloors, setNumFloors] = useState(5);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,10 +97,15 @@ export default function RoomsPage() {
   const fetchRooms = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await roomAPI.getAll(
-        statusFilter !== "all" ? { status: statusFilter } : undefined,
-      );
-      setRooms(res.data ?? []);
+      const [roomRes, settingsRes] = await Promise.all([
+        roomAPI.getAll(
+          statusFilter !== "all" ? { status: statusFilter } : undefined,
+        ),
+        settingsAPI.getAll().catch(() => null),
+      ]);
+      setRooms(roomRes.data ?? []);
+      const s = settingsRes?.data ?? settingsRes ?? {};
+      setNumFloors(parseInt(s.num_floors ?? "5") || 5);
     } catch {
       toast.error(t("common.noData"));
     } finally {
@@ -234,11 +241,13 @@ export default function RoomsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5].map((f) => (
-                          <SelectItem key={f} value={f.toString()}>
-                            {t("rooms.floor")} {f}
-                          </SelectItem>
-                        ))}
+                        {Array.from({ length: numFloors }, (_, i) => i + 1).map(
+                          (f) => (
+                            <SelectItem key={f} value={f.toString()}>
+                              {t("rooms.floor")} {f}
+                            </SelectItem>
+                          ),
+                        )}
                       </SelectContent>
                     </Select>
                   </Field>
