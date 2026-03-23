@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -47,6 +54,7 @@ export default function SettingsPage() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const [pageLoading, setPageLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("dorm");
 
   /* ── Dorm info ── */
   const [dormName, setDormName] = useState("");
@@ -357,29 +365,53 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="dorm" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-1">
-          <TabsTrigger value="dorm" className="text-xs sm:text-sm">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
+        {/* Mobile: Select dropdown */}
+        <div className="sm:hidden">
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dorm">
+                🏠 {language === "th" ? "หอพัก" : "Dorm"}
+              </SelectItem>
+              <SelectItem value="financial">
+                💰 {t("settings.tabFinancial")}
+              </SelectItem>
+              <SelectItem value="utilities">
+                ⚡ {language === "th" ? "สาธารณูปโภค" : "Utilities"}
+              </SelectItem>
+              <SelectItem value="notifications">
+                🔔 {t("settings.tabNotifications")}
+              </SelectItem>
+              <SelectItem value="telegram">✈️ Telegram</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: Tabs */}
+        <TabsList className="hidden sm:grid w-full grid-cols-5">
+          <TabsTrigger value="dorm">
             <Building2 className="h-3.5 w-3.5 mr-1.5" />
             {language === "th" ? "หอพัก" : "Dorm"}
           </TabsTrigger>
-          <TabsTrigger value="financial" className="text-xs sm:text-sm">
+          <TabsTrigger value="financial">
             {t("settings.tabFinancial")}
           </TabsTrigger>
-          <TabsTrigger value="utilities" className="text-xs sm:text-sm">
+          <TabsTrigger value="utilities">
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             {language === "th" ? "สาธารณูปโภค" : "Utilities"}
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs sm:text-sm">
+          <TabsTrigger value="notifications">
             <Bell className="h-3.5 w-3.5 mr-1.5" />
             {t("settings.tabNotifications")}
           </TabsTrigger>
-          <TabsTrigger
-            value="telegram"
-            className="text-xs sm:text-sm col-span-2 sm:col-span-1"
-          >
-            Telegram
-          </TabsTrigger>
+          <TabsTrigger value="telegram">Telegram</TabsTrigger>
         </TabsList>
 
         {/* ── Dorm Info ── */}
